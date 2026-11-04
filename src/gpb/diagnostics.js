@@ -20,7 +20,6 @@ export function domProbe() {
   };
 }
 
-
 export function statusReport() {
   const report = {
     version: VERSION,

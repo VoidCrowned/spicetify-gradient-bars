@@ -3,7 +3,6 @@
 // is shared/selftest.js, the checks are in checks.js. Checks that need the bar are skipped while
 // it isn't there.
 
-
 // ── Self-test ───────────────────────────────────────────────────────────────
 // `await __gcb.selfTest()` in devtools. Drives the same functions and modal DOM the UI uses,
 // checks computed styles on the live bar, then restores everything it touched. Checks that need
@@ -28,14 +27,12 @@ export const HASHED_SAMPLE = ".alQyi9QVSuY6ma3oYVy6";
 
 export const songchangeCount = () => Spicetify.Player.eventListeners?.songchange?.length ?? 0;
 
-
 // Applies settings the way the UI does, then recalculates the text colour at once (no debounce).
 export function setTestSettings(gradient, stops, textColour = DEFAULT_TEXT) {
   setSettings({ version: SCHEMA_VERSION, gradient, textColour, stops: stops.map((s) => ({ ...s })) });
   update();
   recalcTextColour();
 }
-
 
 // Properties our stylesheet may set, all inside the bar's rule.
 const ALLOWED_PROPS = ["background-image", "--text-base", "--essential-base"];
@@ -45,12 +42,10 @@ const HASH_LIKE = /(?<![\w-])[\w-]{16,20}(?![\w-])/g;
 
 export const hashLike = (selector) => (selector.match(HASH_LIKE) ?? []).filter((t) => /[a-z]/.test(t) && /[A-Z]/.test(t));
 
-
 // Anything translucent in the bar's CSS: colours are opaque only.
 const OPACITY_RE = /rgba\(|\btransparent\b|#[0-9a-f]{8}\b/gi;
 
 export const opacityIn = (css) => css.match(OPACITY_RE) ?? [];
-
 
 // Everything our bar stylesheet must never do (CLAUDE.md → Hard rules).
 export function cssProblems(css) {
@@ -68,7 +63,6 @@ export function cssProblems(css) {
   });
 }
 
-
 // The CSS through the browser's own parser: every rule and every declaration must survive.
 export function parseProblems(css) {
   const sheet = new CSSStyleSheet();
@@ -84,7 +78,6 @@ export function parseProblems(css) {
   return problems;
 }
 
-
 // A computed background-image as the browser serialises it, from one of our own elements.
 let probeEl = null;
 
@@ -97,7 +90,6 @@ export function computedImage(image) {
   return out;
 }
 
-
 // The bar's computed state with our stylesheet on and off, read in the same task.
 export function barWithAndWithout(bar, read) {
   const sheet = document.getElementById("gcb-style")?.sheet;
@@ -107,13 +99,11 @@ export function barWithAndWithout(bar, read) {
   return { ours: read(bar), spotify };
 }
 
-
 export const barGeometry = (bar) => {
   const cs = getComputedStyle(bar);
   const r = bar.getBoundingClientRect();
   return `${r.width.toFixed(1)}×${r.height.toFixed(1)}, radius ${cs.borderRadius}, background-color ${cs.backgroundColor}`;
 };
-
 
 function environment() {
   return {

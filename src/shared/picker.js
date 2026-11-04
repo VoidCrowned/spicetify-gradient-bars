@@ -1,4 +1,3 @@
-
 // ── Colour picker (GPB #32, GPB #35) ──
 // Chromium's native picker popup is browser chrome and can't be extended, so this mirrors
 // its layout — saturation/value square, eyedropper, swatch, hue bar, R/G/B — and adds a hex
@@ -13,9 +12,7 @@ import { findStop, linkStopToTheme, selectedId, setStopColour } from "./stops.js
 
 export let pickerHsv = { h: 0, s: 0, v: 0 }; // kept apart from the hex so hue survives greys and black
 
-
 export const pickerStop = () => (modal ? findStop(selectedId) : null);
-
 
 // ── Hex copy button (GPB #56) ──
 // Copies the selected stop's colour as #rrggbb (a theme stop's resolved colour), never the
@@ -25,7 +22,6 @@ export const pickerStop = () => (modal ? findStop(selectedId) : null);
 export const HEX_COPY_LABEL = "Copy hex code";
 
 export const HEX_COPIED_MS = 1500;
-
 
 export async function copyHex(m) {
   const stop = pickerStop();
@@ -44,20 +40,17 @@ export async function copyHex(m) {
   return tier;
 }
 
-
 // In place: only which icon is hidden changes, never the button (GPB #26).
 function showHexCopied(m, copied) {
   m.hexCopyIcon.toggleAttribute("hidden", copied);
   m.hexCopyCheck.toggleAttribute("hidden", !copied);
 }
 
-
 // Loads a stop's current colour into the picker. The previous hue is kept for greys.
 export function showInPicker(stop, from = null) {
   pickerHsv = hexToHsv(resolveStop(stop), pickerHsv.h);
   renderPicker(stop, from);
 }
-
 
 // `from` is the control being edited; it keeps its own text while you type.
 function renderPicker(stop, from = null) {
@@ -85,7 +78,6 @@ function renderPicker(stop, from = null) {
   m.useThemeButton.textContent = isTheme ? "Following theme colour" : "Use theme colour";
 }
 
-
 // Applies a colour to the picker's stop: bar, preview and dot update in place; a theme stop
 // becomes custom. Colours from the square or hue bar keep their exact HSV.
 function commitPickerColour(hex, from = null) {
@@ -98,7 +90,6 @@ function commitPickerColour(hex, from = null) {
   }
   renderPicker(stop, from);
 }
-
 
 // Pointer drag on a picker area → apply({ x, y }) as fractions 0–1. Pointer capture keeps
 // the drag (and its click) on the area even outside the modal; moves are coalesced to one
@@ -143,7 +134,6 @@ function enablePointerDrag(el, apply) {
   el.addEventListener("pointerup", end);
   el.addEventListener("pointercancel", end);
 }
-
 
 export function enableColourPicker(m) {
   const setHsv = (change) => {

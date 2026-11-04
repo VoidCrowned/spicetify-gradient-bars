@@ -1,4 +1,3 @@
-
 // ── Settings modal ──────────────────────────────────────────────────────────
 // Colours come only from Spicetify variables so the modal follows any theme.
 // Never use the id "color-input" or the classes .slider/.toggle/.toggleWrapper —
@@ -23,6 +22,7 @@
 
 import { CODE_PLACEHOLDER, HELP_LINES, IMPORT_TITLE, NAME, P } from "ext:config";
 import { OPTION_ROW_CSS, enableOptionRow, extraRefs, onThemeColour, optionRowMarkup, previewMarkup, renderOptionRow, renderPreview } from "ext:hooks";
+import { setCopyContainer } from "./clipboard.js";
 import { MAX_STOPS, PRESET_NAME_MAX } from "./constants.js";
 import { HEX_COPY_LABEL, enableColourPicker, pickerStop, showInPicker } from "./picker.js";
 import { COPIED_LABEL, COPY_HINT, EXPORT_LABEL, EXPORT_TITLE, enablePresets, renderChips } from "./presets-ui.js";
@@ -146,7 +146,6 @@ ${OPTION_ROW_CSS.trim()}
 // than a container query: inline-size containment could collapse a shrink-to-fit modal.
 export const PICKER_COLUMNS_MIN = 420;
 
-
 export const REORDER_HINT = "Drag or Alt+←/→ to reorder"; // second line of the dot tooltip (GPB #24)
 
 export const ADD_LABEL = "Add colour";
@@ -165,13 +164,11 @@ const MINUS_ICON =
 const PLUS_ICON =
   '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M7.25 2h1.5v5.25H14v1.5H8.75V14h-1.5V8.75H2v-1.5h5.25z"/></svg>';
 
-
 const EXPORT_ICON = // arrow up out of a tray (GPB #52)
   '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M8 1.5 4.5 5h2.75v5.5h1.5V5h2.75z"/><path d="M1 9.5h1.5v4h11v-4H15V15H1z"/></svg>';
 
 const IMPORT_ICON = // arrow down into a tray (GPB #52)
   '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M7.25 1.5h1.5V7h2.75L8 10.5 4.5 7h2.75z"/><path d="M1 9.5h1.5v4h11v-4H15V15H1z"/></svg>';
-
 
 const COPY_ICON = // two overlapping rounded squares: the hex field's copy button (GPB #56)
   '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M5 1.75A1.75 1.75 0 0 1 6.75 0h6.5A1.75 1.75 0 0 1 15 1.75v6.5A1.75 1.75 0 0 1 13.25 10H11V8.5h2.25a.25.25 0 0 0 .25-.25v-6.5a.25.25 0 0 0-.25-.25h-6.5a.25.25 0 0 0-.25.25V4H5z"/><path d="M1 6.75C1 5.784 1.784 5 2.75 5h6.5c.966 0 1.75.784 1.75 1.75v6.5A1.75 1.75 0 0 1 9.25 15h-6.5A1.75 1.75 0 0 1 1 13.25zm1.75-.25a.25.25 0 0 0-.25.25v6.5c0 .138.112.25.25.25h6.5a.25.25 0 0 0 .25-.25v-6.5a.25.25 0 0 0-.25-.25z"/></svg>';
@@ -182,13 +179,13 @@ const CHECK_ICON = // shown in place of a copy button's icon after copying (GPB 
 // Both icons are in the markup and swapped with `hidden`, so no node is replaced (GPB #26).
 export const withClass = (svg, className, hidden = false) => svg.replace("<svg ", `<svg class="${className}"${hidden ? " hidden" : ""} `);
 
-
 const EYEDROPPER_ICON =
   '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M13.35 2.65a2 2 0 0 0-2.83 0L8.9 4.27l-.7-.71-1.06 1.06.7.71-5.3 5.3a1.5 1.5 0 0 0-.44 1.07L2 14l2.3-.1a1.5 1.5 0 0 0 1.07-.44l5.3-5.3.71.7 1.06-1.06-.7-.71 1.61-1.61a2 2 0 0 0 0-2.83zM4.3 12.4l-.8.04.04-.8 5.37-5.37.76.76z"/></svg>';
 
-
 export let modal = null; // the open modal's elements, or null
 
+// Copies made while the modal is open use a textarea inside it (shared/clipboard.js).
+setCopyContainer(() => modal?.root ?? document.body);
 
 export function openModal() {
   const root = document.createElement("div");
@@ -370,7 +367,6 @@ export function openModal() {
   enableKeyboardRemove(m);
 }
 
-
 // Spicetify pads the popup's content 0 24px 24px, but the popup also carries Spotify's
 // track-credits classes, and themes style those: Hazy gives .main-trackCreditsModal-container
 // padding-bottom: 32px, so there were 56 px below the help text against 24 px at the sides
@@ -383,7 +379,6 @@ function evenPopupBottom(root) {
   container.style.paddingBottom = "0px";
   content.style.paddingBottom = getComputedStyle(content).paddingLeft;
 }
-
 
 // Themes like Hazy rewrite --spice-button inline on :root (e.g. on every songchange),
 // so keep the theme swatches and the Spread label colour (GPB #43) current while the modal is open.
@@ -400,7 +395,6 @@ function watchThemeColour(m) {
   m.cleanups.push(() => Spicetify.Player.removeEventListener("songchange", sync));
 }
 
-
 // PopupModal has no close callback: hide() removes it from <body>, and another
 // extension's display() replaces its contents. Either way our root is detached.
 function watchModalClose(m) {
@@ -411,9 +405,7 @@ function watchModalClose(m) {
   observer.observe(Spicetify.PopupModal, { childList: true });
 }
 
-
 export let liveObservers = 0; // checked by the self-test
-
 
 // A MutationObserver that is disconnected when the modal closes.
 function modalObserver(m, callback) {
@@ -426,7 +418,6 @@ function modalObserver(m, callback) {
   return observer;
 }
 
-
 export function closeModal(m) {
   if (m.closed) return;
   m.closed = true;
@@ -434,7 +425,6 @@ export function closeModal(m) {
   if (modal === m) modal = null;
   flushSettings();
 }
-
 
 export function renderModal() {
   closePopover(); // the dots are rebuilt, so the menu would lose its anchor
@@ -450,7 +440,6 @@ export function renderModal() {
   modal.minusButton.disabled = count <= 1;
   modal.minusButton.title = count <= 1 ? REMOVE_LAST_LABEL : REMOVE_LABEL;
 }
-
 
 // In place, never replaced: focus stays on the switch when it adds a colour (GPB #26, GPB #46).
 function renderSwitch() {

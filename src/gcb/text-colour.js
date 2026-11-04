@@ -1,4 +1,3 @@
-
 // ── Text colour (GCB #11–GCB #17) ───────────────────────────────────────────────────
 // Auto puts black or white text on the bar, whichever has the higher WORST-CASE contrast over the
 // colours behind the text — not an average, so a dark stop under light text (or the reverse) is
@@ -21,7 +20,6 @@ export const TEXT_DELAY = 100; // debounce for recalculations (GCB #15)
 
 export const SAMPLES_BETWEEN = 8; // evenly spaced samples between the text region's edges (GCB #13)
 
-
 export let textRegion = null; // { from, to }: the text's span as fractions of the bar's width, last measured
 
 export function setTextRegion(region) {
@@ -34,7 +32,6 @@ let textTimer = 0;
 
 export let textRuns = 0; // counted for the self-test
 
-
 // The colour written into the bar's rule now, or null to leave the text to Spotify. Black and
 // White are literal; Auto is the last calculated choice.
 export function appliedTextColour(s = settings) {
@@ -43,7 +40,6 @@ export function appliedTextColour(s = settings) {
   if (s.textColour === "auto") return textResult?.colour ?? null;
   return null;
 }
-
 
 // The text's span (GCB #12): from the icon's left edge to the text button's right edge, as fractions
 // of the bar's background area (its padding box). Null if the bar has no size or children.
@@ -59,13 +55,10 @@ function measureTextRegion(bar) {
   return from <= to ? { from, to } : null;
 }
 
-
 // What the stops resolve to: the live theme colour from :root and the bar's own colour, as RGB.
 export const textContext = () => ({ theme: hexToRgb(themeHex()), base: hexToRgb(barBase()) });
 
-
 const stopRgb = (stop, { theme }) => (stop.kind === "theme" ? theme : hexToRgb(stop.color));
-
 
 // The colours behind the text (GCB #13): both edges of the region, every stop inside it and 8 evenly
 // spaced points in between, interpolated in sRGB between the opaque stop colours, as the
@@ -86,7 +79,6 @@ export function gradientSamples(s, { from, to }, ctx) {
   return [from, to, ...inside, ...between].sort((a, b) => a - b).map((t) => ({ t, rgb: colourAt(t) }));
 }
 
-
 // Black or white, whichever has the higher worst contrast over all samples (ties: black, as
 // Spotify draws it). No warning when both are low: the user picks and judges the result.
 export function pickTextColour(samples) {
@@ -95,7 +87,6 @@ export function pickTextColour(samples) {
   const white = worst([255, 255, 255]);
   return { colour: white > black ? WHITE : BLACK, black, white };
 }
-
 
 // Measures the bar if it's there (otherwise the last region is kept, or the whole width before
 // the bar has ever been seen), samples, picks, and regenerates the stylesheet. `region` overrides
@@ -130,18 +121,15 @@ export function recalcTextColour({ region = null } = {}) {
   return textResult;
 }
 
-
 export function scheduleTextColour() {
   clearTimeout(textTimer);
   textTimer = setTimeout(recalcTextColour, TEXT_DELAY);
 }
 
-
 // Theme colours (and the bar's own colour under a solid theme colour) change at runtime: Hazy
 // rewrites them on :root after every song change.
 const followsTheme = (s = settings) =>
   s.textColour !== "default" && (isInert(s) || activeStops(s).some((stop) => stop.kind === "theme"));
-
 
 // Recalculation triggers (GCB #15): the bar appearing or changing (an observer on the now-playing
 // aside), the window resizing, and — while a theme-colour stop is used — song changes and
@@ -153,7 +141,6 @@ export let asideObserver = null;
 export let watchedAside = null;
 
 let bodyObserver = null;
-
 
 function watchBar() {
   const aside = document.querySelector(PARENT);
@@ -180,7 +167,6 @@ function watchBar() {
   if (aside.parentElement) asideObserver.observe(aside.parentElement, { childList: true });
 }
 
-
 // Most mutations in the aside are the player's own (the time label every second): only ones
 // that add or remove a direct child, or happen inside the bar, schedule a recalculation.
 function onAsideMutation(records) {
@@ -192,9 +178,7 @@ function onAsideMutation(records) {
   if (records.some((r) => (r.target === watchedAside && r.type === "childList") || insideBar(r.target))) scheduleTextColour();
 }
 
-
 export const onThemeChange = () => followsTheme() && scheduleTextColour();
-
 
 export function watchTextTriggers() {
   watchBar();

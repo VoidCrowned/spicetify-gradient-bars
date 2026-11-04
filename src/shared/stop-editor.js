@@ -1,4 +1,3 @@
-
 // ── Selection ──
 // Exactly one dot is selected (it has the ring); the inline picker always edits it (GPB #35).
 // selectedId lives in stops.js.
@@ -15,7 +14,6 @@ export function dotEl(id) {
   return modal?.stopsRow.querySelector(`.${P}-stop[data-id="${CSS.escape(id)}"]`) ?? null;
 }
 
-
 // Moves the ring in place — the dots row is not re-rendered.
 export function selectStop(id, { focusHex = false } = {}) {
   const stop = findStop(id);
@@ -31,7 +29,6 @@ export function selectStop(id, { focusHex = false } = {}) {
   if (focusHex) modal.hex.focus({ preventScroll: true });
 }
 
-
 // ── Dot menu popover (GPB #33) ──
 // Rendered inside the modal root: Spicetify's PopupModal hides itself when a click lands
 // outside .GenericModal (GPB #26). Shown and hidden, never removed while the modal is open, so a
@@ -45,7 +42,6 @@ const POPOVER_EDGE = 8; // min distance from the window edge
 
 const POPOVER_GAP = 8; // between a dot and a popover anchored to it
 
-
 // `at` is a viewport point (menu at the cursor); without it the popover sits under the dot.
 // `anchor` is a dot by default, or a preset chip (GPB #21).
 export function showPopover(id, el, at = null, anchor = dotEl(id)) {
@@ -57,7 +53,6 @@ export function showPopover(id, el, at = null, anchor = dotEl(id)) {
   return true;
 }
 
-
 export function closePopover({ focusDot = false } = {}) {
   if (!popover) return;
   const { el, anchor } = popover;
@@ -66,9 +61,7 @@ export function closePopover({ focusDot = false } = {}) {
   if (focusDot && anchor.isConnected) anchor.focus({ preventScroll: true });
 }
 
-
 export const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max));
-
 
 // position: fixed escapes the modal's overflow clipping. A transformed ancestor would make
 // it relative to that ancestor instead of the window; measuring at 0,0 finds the offset.
@@ -95,7 +88,6 @@ function placePopover() {
   el.style.top = `${top - origin.top}px`;
 }
 
-
 // Escape, or a click or focus anywhere outside the open menu, closes it. Listeners live
 // only while the modal is open.
 export function watchPopovers(m) {
@@ -115,7 +107,6 @@ export function watchPopovers(m) {
   listen(window, "resize", () => closePopover());
   listen(document, "scroll", () => closePopover());
 }
-
 
 // Right-click (or the context-menu key / Shift+F10) on a dot: Duplicate, Remove (GPB #33).
 export function enableDotMenu(m) {
@@ -154,9 +145,7 @@ export function enableDotMenu(m) {
   m.removeItem.addEventListener("click", () => runMenuAction(removeStop));
 }
 
-
 export const menuItems = () => [...modal.menu.querySelectorAll(`.${P}-menu-item:not(:disabled):not([hidden])`)];
-
 
 // One menu element for dots (Duplicate, Remove) and own preset chips (Rename, Update, Delete).
 export function setMenuKind(kind) {
@@ -165,14 +154,12 @@ export function setMenuKind(kind) {
   modal.menu.setAttribute("aria-label", kind === "dot" ? "Colour actions" : "Preset actions");
 }
 
-
 function openMenu(id, { at = null, keyboard = false } = {}) {
   setMenuKind("dot");
   modal.duplicateItem.disabled = settings.stops.length >= MAX_STOPS;
   modal.removeItem.disabled = settings.stops.length <= 1;
   if (showPopover(id, modal.menu, at) && keyboard) menuItems()[0]?.focus({ preventScroll: true });
 }
-
 
 // Hides the menu first, then acts: the clicked item stays connected, so the modal stays
 // open (GPB #26). `action(id)` returns the id of the dot that should get focus afterwards.
@@ -186,9 +173,7 @@ function runMenuAction(action) {
 
 export let lastDragEnd = -Infinity; // set by drag-and-drop; a click right after a drag is ignored
 
-
 export const STOP_GAP = 14; // matches .${P}-stops gap; .${P}-dots' 10 px gap + its 4 px padding put the stepper as far away (GPB #47, GPB #49)
-
 
 // The dots are buttons, so dragging never fights a native colour input (GPB #8, GPB #31).
 export function enableDragAndDrop(m) {
@@ -232,7 +217,6 @@ export function enableDragAndDrop(m) {
   row.addEventListener("dragend", endDrag);
 }
 
-
 // Alt + ←/→ moves the focused dot one place, Alt + Home/End to the first or last place (GPB #24),
 // through the same moveStop() as drag-and-drop. The row is re-rendered, so focus goes to the
 // new node with the same id; the selection doesn't change. Plain arrows, Enter/Space and
@@ -255,7 +239,6 @@ export function enableKeyboardReorder(m) {
   });
 }
 
-
 // Delete or Backspace on a focused dot removes that dot (GPB #49) through the same removeStop() as
 // the dot menu and −, so the selection rule (GPB #35) applies. Focus goes to the dot now at its
 // index. With one colour nothing is removed, but the key is still consumed. On .${P}-stops, so
@@ -274,7 +257,6 @@ export function enableKeyboardRemove(m) {
   });
 }
 
-
 // Insertion index under the pointer; the row wraps, so compare line first, then x.
 function dropIndexAt(row, x, y) {
   const stops = [...row.querySelectorAll(`.${P}-stop`)];
@@ -284,7 +266,6 @@ function dropIndexAt(row, x, y) {
   });
   return i === -1 ? stops.length : i;
 }
-
 
 // Absolutely positioned so showing it never reflows the row.
 function showDropMarker(row, index) {
@@ -297,7 +278,6 @@ function showDropMarker(row, index) {
   marker.style.top = `${ref.top - rowRect.top}px`;
   marker.hidden = false;
 }
-
 
 export function renderStops() {
   const row = modal.stopsRow;
@@ -321,7 +301,6 @@ export function renderStops() {
   marker.hidden = true;
   row.appendChild(marker);
 }
-
 
 // Updates one dot in place.
 export function renderStop(stop) {

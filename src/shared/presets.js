@@ -1,7 +1,6 @@
 // Presets (GPB #21, GCB #29): five built-ins and up to 12 of the user's own, in their own
 // storage key (PRESETS_KEY) with their own version.
 
-
 // Colours only, all fixed (no theme stops): applying one keeps the current EXTRA_KEY setting (the
 // Spread mode, the text colour). They can't be renamed or deleted, and they have their own chip
 // row (GPB #53). Both extensions have the same five.

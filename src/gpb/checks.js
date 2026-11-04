@@ -1,4 +1,3 @@
-
 // ── Shared top-bar button (GPB #58) ──
 
 import { clipboardSources } from "../shared/clipboard.js";
@@ -205,7 +204,6 @@ export async function checkSharedEntry(check) {
     `live entries ${window.__gradientBars?.entries.map((e) => e.id).join() ?? "none"}`);
 }
 
-
 // ── Entry icon (GPB #44) ──
 export async function checkEntryIcon(check) {
   check(44, "Entry icon: currentColor, 16 × 16 viewBox, no id= and no <defs>",
@@ -275,7 +273,6 @@ export async function checkEntryIcon(check) {
     host.remove();
   }
 }
-
 
 export async function runChecks(check, rootStyle, restoreButton) {
   // ── Rendering ──

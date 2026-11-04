@@ -1,4 +1,3 @@
-
 // ── Presets row (GPB #21) ──
 // Two chip rows (GPB #53): the built-ins, then own presets and + Save. Applying is always two-step: the
 // first click arms the chip ("Apply?"; hidden sizers keep its width) and previews it in the
@@ -30,11 +29,9 @@ export const SAVE_FULL_LABEL = `Up to ${MAX_PRESETS} presets`;
 
 const OWN_PRESET_HINT = "Right-click to rename, update or delete";
 
-
 export const chipEl = (id) => modal?.chips.querySelector(`.${P}-preset-chip[data-preset="${CSS.escape(id)}"]`) ?? null;
 
 const isOwnPreset = (id) => presets.some((p) => p.id === id);
-
 
 export function enablePresets(m) {
   m.chips.addEventListener("click", (e) => {
@@ -92,7 +89,6 @@ export function enablePresets(m) {
   });
 }
 
-
 // ── Sharing (GPB #21) ──
 // Export puts a gpb1: code on the clipboard (writeClipboard()) and confirms on the button
 // itself (GPB #54); only if every tier fails does the code show in a selected read-only field. Import is an inline paste field, never navigator.clipboard.readText()
@@ -112,7 +108,6 @@ export const COPY_HINT = /Mac/i.test(navigator.platform) ? "Press ⌘C to copy" 
 export const IMPORT_ERROR = "Not a valid code";
 
 export const PREVIEW_CODE_MESSAGE = "Previewing code — Apply to use it";
-
 
 function enableSharing(m) {
   m.exportButton.addEventListener("click", () => copyCode(m));
@@ -138,7 +133,6 @@ function enableSharing(m) {
   m.cleanups.push(() => clearTimeout(m.copiedTimer));
 }
 
-
 // Resolves to the tier that copied the code, or null when the fallback field shows instead.
 export async function copyCode(m) {
   const code = encodeCode(settings);
@@ -157,7 +151,6 @@ export async function copyCode(m) {
   return tier;
 }
 
-
 // In place: only the label's text and which icon is hidden change, never the button (GPB #26).
 function showExportCopied(m, copied) {
   clearTimeout(m.copiedTimer);
@@ -166,7 +159,6 @@ function showExportCopied(m, copied) {
   m.exportCheck.toggleAttribute("hidden", !copied);
   if (copied) m.copiedTimer = setTimeout(() => showExportCopied(m, false), COPIED_MS);
 }
-
 
 // Opening empties the field and closing ends its preview, so the strip shows the current
 // settings either way.
@@ -183,13 +175,11 @@ function toggleImport(m, open = m.importPanel.hidden) {
   renderStatus();
 }
 
-
 function setImportError(m, invalid) {
   if (invalid) m.codeInput.setAttribute("aria-invalid", "true");
   else m.codeInput.removeAttribute("aria-invalid");
   m.importError.textContent = invalid ? IMPORT_ERROR : "";
 }
-
 
 // An invalid code changes nothing. A valid one applies; the panel (with the clicked Apply in
 // it) is hidden, not removed (GPB #26).
@@ -206,7 +196,6 @@ function importCode(m) {
   return true;
 }
 
-
 // The active chip does nothing; any other is armed (and previewed) by the first click and
 // applied by the second. A click on another chip disarms this one first (outside input), so
 // browsing moves the arm and the preview chip by chip.
@@ -218,7 +207,6 @@ function clickChip(m, chip) {
   applySettings(presetSettings(preset), `Applied "${preset.name}"`, chip);
 }
 
-
 function armChip(m, chip, preset) {
   disarmChip(m);
   chip.classList.add(`${P}-armed`);
@@ -228,7 +216,6 @@ function armChip(m, chip, preset) {
   renderPreview();
   renderStatus();
 }
-
 
 function disarmChip(m) {
   if (!m.armed) return;
@@ -243,7 +230,6 @@ function disarmChip(m) {
   renderStatus();
 }
 
-
 // What the strip shows instead of the current settings (GPB #51): the armed chip's preset, or a
 // valid code in the open Import field. Null when nothing is being previewed.
 export function previewing(m) {
@@ -251,7 +237,6 @@ export function previewing(m) {
   const code = m.importPanel.hidden ? null : decodeShareCode(m.codeInput.value);
   return code && { settings: code.settings, message: PREVIEW_CODE_MESSAGE };
 }
-
 
 // Replaces the settings (selection back on the first dot) and offers Undo for the old ones.
 // settingsReplaced() is the extension's own follow-up before the update (GCB: the text colour is
@@ -271,7 +256,6 @@ function applySettings(next, message, focusAfterUndo = null) {
   }, { trackSettings: true });
 }
 
-
 function deleteWithUndo(m, id) {
   const removed = deletePreset(id);
   if (!removed) return;
@@ -282,13 +266,11 @@ function deleteWithUndo(m, id) {
   }, { kind: "preset" });
 }
 
-
 // ── Undo (GPB #21) ──
 // One pending undo at a time: a new action replaces it. It lasts UNDO_MS, ends when the modal
 // closes, and a settings undo also ends when the settings change some other way (update()).
 
 export let pendingUndo = null; // { message, kind, restore(hadFocus), after, timer }
-
 
 function offerUndo(message, restore, { trackSettings = false, kind = "settings" } = {}) {
   clearUndo();
@@ -297,14 +279,12 @@ function offerUndo(message, restore, { trackSettings = false, kind = "settings" 
   renderStatus();
 }
 
-
 export function clearUndo() {
   if (!pendingUndo) return;
   clearTimeout(pendingUndo.timer);
   pendingUndo = null;
   renderStatus();
 }
-
 
 // The Undo button is hidden, not removed, in its own click (GPB #26).
 function runUndo() {
@@ -314,7 +294,6 @@ function runUndo() {
   clearUndo();
   undo.restore(hadFocus);
 }
-
 
 // The status line under the chips: a preview's message wins (GPB #51); when the preview ends, a
 // still-running Undo shows again.
@@ -326,7 +305,6 @@ function renderStatus() {
   modal.undoText.textContent = preview ? preview.message : undo ? `${undo.message} · ` : "";
   modal.undoButton.hidden = !undo;
 }
-
 
 // ── Chip row rendering ──
 
@@ -342,7 +320,6 @@ export function renderChips(m) {
   renderPresetStates();
 }
 
-
 // After Save, Rename, Update and Delete: deferred, with the menu closed first (GPB #26).
 function renderChipsLater(m, focusId = null) {
   closePopover();
@@ -354,7 +331,6 @@ function renderChipsLater(m, focusId = null) {
     target?.focus({ preventScroll: true });
   }, 0);
 }
-
 
 // A pill: a 12 px swatch painted with the preset's previewImage(), and the name. Names are user
 // text, so they only ever go in through textContent.
@@ -376,7 +352,6 @@ function presetChip(preset) {
   return chip;
 }
 
-
 // The chip whose settings equal the current ones is marked active.
 export function renderPresetStates() {
   if (!modal) return;
@@ -385,7 +360,6 @@ export function renderPresetStates() {
     chip.setAttribute("aria-pressed", String(!!preset && matchesPreset(preset)));
   }
 }
-
 
 // ── Naming (+ Save, Rename) ──
 // One inline name field (not a popover) takes the place of the + Save chip or of the chip
@@ -407,7 +381,6 @@ function startNaming(m, mode, id = null) {
   m.nameField.select();
 }
 
-
 function stopNaming(m, { commit = false, refocus = false } = {}) {
   const naming = m.naming;
   if (!naming) return;
@@ -427,7 +400,6 @@ function stopNaming(m, { commit = false, refocus = false } = {}) {
   }
 }
 
-
 // ── Chip menu ──
 // The dot menu's popover (GPB #33) with the preset items instead: inside the modal root, hidden,
 // never removed.
@@ -439,7 +411,6 @@ function openChipMenu(id, { at = null, keyboard = false } = {}) {
   setMenuKind("chip");
   if (showPopover(id, modal.menu, at, anchor) && keyboard) menuItems()[0]?.focus({ preventScroll: true });
 }
-
 
 function runChipAction(action) {
   if (!popover) return;

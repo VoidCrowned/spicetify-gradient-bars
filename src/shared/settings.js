@@ -2,7 +2,6 @@
 // through the extension's migrations and validateSettings(), applied on every change and saved
 // debounced.
 
-
 // The current settings. Only this module assigns it; everything else calls setSettings().
 
 import { KEEP_NEWER_SETTINGS, P, SCHEMA_VERSION, STORAGE_KEY } from "ext:config";

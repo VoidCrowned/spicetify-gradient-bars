@@ -22,7 +22,6 @@ export const songHandle = () => document.querySelector(`${SCOPE} ${HANDLE}`);
 // ours by identity rather than comparing counts across the run (GPB #60).
 export const songchangeListeners = () => [...(Spicetify.Player.eventListeners?.songchange ?? [])];
 
-
 // Variables themes and other extensions read from the bar — we must never change them.
 export function barVars(fill) {
   const cs = getComputedStyle(fill.closest(".progress-bar") ?? fill);
@@ -30,7 +29,6 @@ export function barVars(fill) {
     .map((v) => `${v}: ${cs.getPropertyValue(v).trim()}`)
     .join("; ");
 }
-
 
 // Size, shape and masking of the song bar — identical with and without our rules.
 export function barGeometry(fill) {
@@ -47,17 +45,14 @@ export function barGeometry(fill) {
   });
 }
 
-
 export function setTestSettings(gradient, stops, mode = DEFAULT_MODE) {
   setSettings({ version: SCHEMA_VERSION, gradient, mode, stops: stops.map((s) => ({ ...s })) });
   update();
 }
 
-
 // Declarations our stylesheet must never contain (CLAUDE.md → Hard rules).
 const FORBIDDEN_PROP =
   /^(-webkit-)?(mask(-.+)?|height|width|transform|clip-path|--progress-bar-.+|--fg-color|--bg-color|--is-active-fg-color)$/;
-
 
 // `mode` is the mode the CSS was built for. The only exception (GPB #15): Anchored's fill rule
 // may set `transform: none` and `clip-path`.
@@ -72,7 +67,6 @@ export function cssProblems(css, mode) {
   });
 }
 
-
 // The fill's computed transform with our stylesheet and without it, read in the same task so
 // playback can't move in between.
 export function fillTransforms(fill) {
@@ -83,7 +77,6 @@ export function fillTransforms(fill) {
   return { ours: getComputedStyle(fill).transform, spotify };
 }
 
-
 // playback-bar-waveform masks the song bar's slider areas with held Web Animations.
 export function hasMaskAnimation(el) {
   return el.getAnimations().some(
@@ -93,12 +86,10 @@ export function hasMaskAnimation(el) {
   );
 }
 
-
 export function waveformActive() {
   if (!document.getElementById("progress_bar_waveform_mask")) return false;
   return [...document.querySelectorAll(`${SCOPE} .x-progressBar-sliderArea`)].some(hasMaskAnimation);
 }
-
 
 function environment() {
   return {

@@ -20,7 +20,6 @@ export function domProbe() {
   };
 }
 
-
 export function statusReport() {
   const report = {
     version: VERSION,
@@ -44,7 +43,6 @@ export function statusReport() {
   console.log(`[gcb] ${report.phase}${report.entry ? `, entry: ${report.entry}` : ""}`);
   return report;
 }
-
 
 // The text colour in status() (GCB #17), for debugging: mode, the chosen colour, its worst-case
 // contrast, the text region as fractions of the bar's width, and whether the bar is there.

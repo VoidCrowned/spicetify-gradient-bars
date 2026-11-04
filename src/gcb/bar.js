@@ -1,4 +1,3 @@
-
 // The Connect bar ("Playing on …" below the player), verified on Spotify 1.3.4.258 (CLAUDE.md →
 // Verified facts). Spotify only renders it while audio plays on another device and removes it when
 // playback comes back. Found by the aside's test id, Encore's readable set class and its icon +
@@ -17,17 +16,14 @@ export const BAR_ICON = ':scope > svg[data-encore-id="icon"]';
 
 export const BAR_LINK = ':scope > button[data-encore-id="textLink"]';
 
-
 // The bar, queried on demand. Never stored: Spotify removes and re-creates it.
 export const findBar = () => document.querySelector(SELECTOR);
-
 
 // The bar's own colour, kept under a solid theme colour and shown under the preview: the live
 // bar's computed background-color (Spotify paints it with var(--background-base)), else the last
 // one seen, else what Spicetify maps --background-base to for .encore-bright-accent-set:
 // --spice-button-active.
 let lastBarBase = null;
-
 
 export function barBase() {
   const bar = findBar();

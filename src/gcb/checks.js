@@ -1,4 +1,3 @@
-
 // ── Entry points (GCB #34, GCB #35) ──
 
 import { clipboardSources } from "../shared/clipboard.js";
@@ -200,7 +199,6 @@ export async function checkEntries(check, skip) {
       !(KEY in window) && !(OTHER_KEY in window) && !document.querySelector(`[id^="${PREFIX}"], [class^="${PREFIX}"]`),
     `live entries ${window.__gradientBars?.entries.map((e) => e.id).join() ?? "none"}`);
 }
-
 
 export async function runChecks(check, skip, rootStyle, restoreButton) {
   // ── Selector (GCB #3) ──

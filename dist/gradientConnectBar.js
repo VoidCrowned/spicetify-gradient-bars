@@ -1,10 +1,11 @@
 // NAME: Gradient Connect Bar
+// VERSION: 1.0.0
 // AUTHOR: VoidCrowned
 // REPO: https://github.com/VoidCrowned/spicetify-gradient-bars
 // DESCRIPTION: Recolours Spotify's Connect bar ("Playing on …") with a solid colour or a multi-stop gradient.
 // LICENSE: WTFPL v2, see LICENSE
 //
-// Built from src/ (shared/ and gcb/) with esbuild: edit those, then run npm run build.
+// Built from src/shared/ and src/gcb/ with esbuild: edit those, then run npm run build.
 
 (() => {
   // src/gcb/config.js
@@ -36,7 +37,8 @@
   // src/shared/claim.js
   var COPY = "gcb";
   var COPY_NAMES = { gpb: "Gradient Progress Bar", gcb: "Gradient Connect Bar", gb: "Gradient Bars" };
-  var describe = (copy) => `${COPY_NAMES[copy.copy] ?? copy.copy}${copy.version ? ` ${copy.version}` : ""}`;
+  var COPY_FILES = { gpb: "gradientProgressBar.js", gcb: "gradientConnectBar.js", gb: "gradientBars.js" };
+  var fileOf = (copy) => COPY_FILES[copy.copy] ?? copy.copy;
   function claimBar({ id = P, copy = COPY, version = VERSION, source = SOURCE, registry = null, globals = window, warn = console.warn } = {}) {
     const copies = registry ?? (globals.__gradientBarsCopies ??= {});
     const entry = copies[id] ??= { active: null, skipped: [] };
@@ -46,7 +48,7 @@
     if (entry.active) {
       entry.skipped.push(me);
       me.warnings++;
-      warn(`[${id}] ${COPY_NAMES[id]} is already running from ${describe(entry.active)}, so ${describe(me)} skips it. Keep one of them installed.`);
+      warn(`[${id}] ${COPY_NAMES[id]} already runs from ${fileOf(entry.active)}, so this copy (${fileOf(me)}) skips it. Keep only one of them installed.`);
       return false;
     }
     entry.active = me;
@@ -72,6 +74,10 @@
 
   // src/shared/clipboard.js
   var CLIPBOARD_TIMEOUT_MS = 1500;
+  var copyContainer = () => document.body;
+  function setCopyContainer(container) {
+    copyContainer = container;
+  }
   var clipboardSources = {
     // where the tiers come from; the self-test swaps these for stubs
     api: () => window.Spicetify?.Platform?.ClipboardAPI,
@@ -113,7 +119,7 @@
     buffer.setAttribute("aria-hidden", "true");
     Object.assign(buffer.style, { position: "fixed", top: "0", left: "0", width: "1px", height: "1px", padding: "0", border: "0", opacity: "0", pointerEvents: "none" });
     const focused = document.activeElement;
-    (modal?.root ?? document.body).append(buffer);
+    copyContainer().append(buffer);
     buffer.focus({ preventScroll: true });
     buffer.select();
     let copied = false;
@@ -1330,6 +1336,7 @@ ${OPTION_ROW_CSS.trim()}
   var withClass = (svg, className, hidden = false) => svg.replace("<svg ", `<svg class="${className}"${hidden ? " hidden" : ""} `);
   var EYEDROPPER_ICON = '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M13.35 2.65a2 2 0 0 0-2.83 0L8.9 4.27l-.7-.71-1.06 1.06.7.71-5.3 5.3a1.5 1.5 0 0 0-.44 1.07L2 14l2.3-.1a1.5 1.5 0 0 0 1.07-.44l5.3-5.3.71.7 1.06-1.06-.7-.71 1.61-1.61a2 2 0 0 0 0-2.83zM4.3 12.4l-.8.04.04-.8 5.37-5.37.76.76z"/></svg>';
   var modal = null;
+  setCopyContainer(() => modal?.root ?? document.body);
   function openModal() {
     const root = document.createElement("div");
     root.className = `${P}-modal`;
@@ -2237,6 +2244,32 @@ ${OPTION_ROW_CSS.trim()}
     return null;
   }
 
+  // src/shared/report.js
+  function createResults() {
+    const results = [];
+    const check = (issue, name, pass, detail = "") => results.push({ id: results.length + 1, issue: `#${issue}`, check: name, pass: !!pass, detail: String(detail) });
+    const skip = (issue, name, reason) => results.push({ id: results.length + 1, issue: `#${issue}`, check: name, pass: null, skipped: reason, detail: "" });
+    return { results, check, skip };
+  }
+  function summarise(results) {
+    const failed = results.filter((r) => r.pass === false).length;
+    const skipped = results.filter((r) => r.pass === null).length;
+    const passed = results.length - failed - skipped;
+    return `${passed}/${results.length - skipped} passed${skipped ? `, ${skipped} skipped` : ""}${failed ? `, ${failed} FAILED` : ""}`;
+  }
+  function reportLines(tag, report) {
+    const oneLine = (text) => String(text).replace(/\s*\n\s*/g, " ⏎ ");
+    return [
+      `[${tag}] self-test: ${report.summary}`,
+      ...report.results.filter((r) => r.pass === false).map((r) => `  ✗ ${r.id} ${r.issue} ${r.check} — ${oneLine(r.detail)}`)
+    ];
+  }
+  async function printReport(tag, lines, report, { full = false } = {}) {
+    console.log(lines.join("\n"));
+    const copied = !!await writeClipboard(full ? JSON.stringify(report, null, 2) : lines.join("\n"));
+    if (!copied) console.warn(`[${tag}] Couldn't copy the report: it's the return value.`);
+  }
+
   // src/shared/selftest.js
   var RED = "#ff0000";
   var GREEN = "#00ff00";
@@ -2248,10 +2281,10 @@ ${OPTION_ROW_CSS.trim()}
   var styleText = () => document.getElementById(`${P}-style`)?.textContent ?? null;
   var computedHex = (el, prop) => el ? toHex(getComputedStyle(el)[prop]) : null;
   var BAR_FILES = [FILE, "gradientBars.js"];
-  var fileOf = (src) => src?.split(/[?#]/)[0].split("/").pop() ?? null;
-  var loadedCopies = () => [...document.querySelectorAll("script[src]")].map((el) => el.src).filter((src) => BAR_FILES.includes(fileOf(src)));
-  var sameFileCopies = (copies = loadedCopies()) => copies.filter((src) => fileOf(src) === fileOf(SOURCE ?? FILE));
-  var fileName = () => fileOf(SOURCE ?? FILE);
+  var fileOf2 = (src) => src?.split(/[?#]/)[0].split("/").pop() ?? null;
+  var loadedCopies = () => [...document.querySelectorAll("script[src]")].map((el) => el.src).filter((src) => BAR_FILES.includes(fileOf2(src)));
+  var sameFileCopies = (copies = loadedCopies()) => copies.filter((src) => fileOf2(src) === fileOf2(SOURCE ?? FILE));
+  var fileName = () => fileOf2(SOURCE ?? FILE);
   function copiesDetail(copies) {
     const own = sameFileCopies(copies);
     const others = copies.filter((src) => !own.includes(src));
@@ -2293,30 +2326,6 @@ ${OPTION_ROW_CSS.trim()}
     };
     return { rootStyle, restoreButton, restore };
   }
-  function createResults() {
-    const results = [];
-    const check = (issue, name, pass, detail = "") => results.push({ id: results.length + 1, issue: `#${issue}`, check: name, pass: !!pass, detail: String(detail) });
-    const skip = (issue, name, reason) => results.push({ id: results.length + 1, issue: `#${issue}`, check: name, pass: null, skipped: reason, detail: "" });
-    return { results, check, skip };
-  }
-  function summarise(results) {
-    const failed = results.filter((r) => r.pass === false).length;
-    const skipped = results.filter((r) => r.pass === null).length;
-    const passed = results.length - failed - skipped;
-    return `${passed}/${results.length - skipped} passed${skipped ? `, ${skipped} skipped` : ""}${failed ? `, ${failed} FAILED` : ""}`;
-  }
-  function reportLines(tag, report) {
-    const oneLine = (text) => String(text).replace(/\s*\n\s*/g, " ⏎ ");
-    return [
-      `[${tag}] self-test: ${report.summary}`,
-      ...report.results.filter((r) => r.pass === false).map((r) => `  ✗ ${r.id} ${r.issue} ${r.check} — ${oneLine(r.detail)}`)
-    ];
-  }
-  async function printReport(lines, report, { full = false } = {}) {
-    console.log(lines.join("\n"));
-    const copied = !!await writeClipboard(full ? JSON.stringify(report, null, 2) : lines.join("\n"));
-    if (!copied) console.warn(`[${P}] Couldn't copy the report: it's the return value.`);
-  }
   var selfTestRunning = false;
   async function runSelfTest(options = {}, suite) {
     if (selfTestRunning) return console.warn(`[${P}] The self-test is already running.`);
@@ -2329,7 +2338,7 @@ ${OPTION_ROW_CSS.trim()}
       selfTestRunning = false;
     }
     const report = { summary: summarise(results), environment: environment2, results };
-    if (!options.quiet) await printReport(reportLines(P, report), report, options);
+    if (!options.quiet) await printReport(P, reportLines(P, report), report, options);
     return report;
   }
   function outline(el, depth = 0, maxDepth = 3, { encore = true } = {}) {

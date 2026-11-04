@@ -12,9 +12,11 @@ import { P, SOURCE, VERSION } from "ext:config";
 
 export const COPY = "__COPY__";
 
-const COPY_NAMES = { gpb: "Gradient Progress Bar", gcb: "Gradient Connect Bar", gb: "Gradient Bars" };
+export const COPY_NAMES = { gpb: "Gradient Progress Bar", gcb: "Gradient Connect Bar", gb: "Gradient Bars" };
 
-const describe = (copy) => `${COPY_NAMES[copy.copy] ?? copy.copy}${copy.version ? ` ${copy.version}` : ""}`;
+const COPY_FILES = { gpb: "gradientProgressBar.js", gcb: "gradientConnectBar.js", gb: "gradientBars.js" };
+
+const fileOf = (copy) => COPY_FILES[copy.copy] ?? copy.copy;
 
 // Claims bar `id` for this copy. Returns true if this copy runs it, false if it must skip it.
 // The overrides are for the self-test's own registry and globals.
@@ -29,7 +31,7 @@ export function claimBar({ id = P, copy = COPY, version = VERSION, source = SOUR
   if (entry.active) {
     entry.skipped.push(me);
     me.warnings++;
-    warn(`[${id}] ${COPY_NAMES[id]} is already running from ${describe(entry.active)}, so ${describe(me)} skips it. Keep one of them installed.`);
+    warn(`[${id}] ${COPY_NAMES[id]} already runs from ${fileOf(entry.active)}, so this copy (${fileOf(me)}) skips it. Keep only one of them installed.`);
     return false;
   }
   entry.active = me;

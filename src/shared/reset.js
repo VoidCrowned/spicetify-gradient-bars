@@ -1,4 +1,3 @@
-
 // ── Two-step Reset (GPB #37) ──
 // Reset can't be undone, so the first click only arms it
 // ("Confirm reset?" in red); a second click within RESET_CONFIRM_MS resets. Only the label
@@ -11,7 +10,6 @@ import { resetSettings } from "./stops.js";
 export const RESET_CONFIRM_MS = 3000;
 
 export const RESET_CONFIRM_LABEL = "Confirm reset?";
-
 
 export function enableReset(m) {
   const button = m.resetButton;
@@ -37,7 +35,6 @@ export function enableReset(m) {
   disarmOnOutsideInput(m, () => (armed() ? button : null), disarm);
   m.cleanups.push(disarm); // clears the timer when the modal closes
 }
-
 
 // An armed two-step button (Reset, a preset chip) disarms on Escape — stopped there, so the
 // modal stays — and on any pointerdown, click or keydown elsewhere. Enter/Space on the button

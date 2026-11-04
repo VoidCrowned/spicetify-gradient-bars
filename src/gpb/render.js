@@ -1,4 +1,3 @@
-
 // Song progress bar only — the volume slider is the same component without this test id.
 
 import { isInert, settings, stopColour } from "../shared/settings.js";
@@ -9,12 +8,10 @@ export const FILL = ".x-progressBar-fillColor";
 
 export const HANDLE = ':is([data-testid="progress-bar-handle"], .progress-bar__slider, .x-progressBar-handle)';
 
-
 // The colours actually drawn: all stops for a gradient, otherwise just the first.
 function activeColours(s) {
   return s.gradient ? s.stops.map(stopColour) : [stopColour(s.stops[0])];
 }
-
 
 // The fill's background image — also used by the modal preview so the two can't drift.
 // Stops are evenly spaced.
@@ -23,7 +20,6 @@ export function fillImage(s) {
   if (colours.length === 1) return `linear-gradient(${colours[0]}, ${colours[0]})`;
   return `linear-gradient(90deg, ${colours.join(", ")})`;
 }
-
 
 // The fill is a full-width element translated left, so only its rightmost
 // --progress-bar-transform percent is visible. Gradient-only declarations per mode (GPB #15):
@@ -46,7 +42,6 @@ const MODE_CSS = {
   slide: [],
 };
 
-
 // Selectors are ≥ 0,2,0 so they beat themes' single-class rules without !important.
 // background-image (not -color) keeps Spotify's hover swap of background-color hidden.
 // Solid output is the same in every mode.
@@ -66,7 +61,6 @@ export function buildCss(s) {
     ``,
   ].join("\n");
 }
-
 
 export function applyCss() {
   let style = document.getElementById("gpb-style");

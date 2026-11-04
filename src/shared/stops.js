@@ -1,4 +1,3 @@
-
 // ── Stops ───────────────────────────────────────────────────────────────────
 // Changes to the colour stops, shared by the dots, the stepper, the menus and the picker.
 

@@ -8,10 +8,10 @@
 
 import { FILE, P, PRESETS_KEY, SOURCE, STORAGE_KEY } from "ext:config";
 import { applyCss, settingsReplaced } from "ext:hooks";
-import { writeClipboard } from "./clipboard.js";
 import { toHex } from "./colour.js";
 import { closeModal, modal } from "./modal.js";
 import { presets, setPresets } from "./presets.js";
+import { createResults, printReport, reportLines, summarise } from "./report.js";
 import { cancelSave, setSettings, settings } from "./settings.js";
 
 export const RED = "#ff0000";
@@ -96,39 +96,6 @@ export function saveTestState() {
   return { rootStyle, restoreButton, restore };
 }
 
-// Results in the order they were checked. pass: true, false, or null for a skipped check.
-function createResults() {
-  const results = [];
-  const check = (issue, name, pass, detail = "") =>
-    results.push({ id: results.length + 1, issue: `#${issue}`, check: name, pass: !!pass, detail: String(detail) });
-  const skip = (issue, name, reason) =>
-    results.push({ id: results.length + 1, issue: `#${issue}`, check: name, pass: null, skipped: reason, detail: "" });
-  return { results, check, skip };
-}
-
-function summarise(results) {
-  const failed = results.filter((r) => r.pass === false).length;
-  const skipped = results.filter((r) => r.pass === null).length;
-  const passed = results.length - failed - skipped;
-  return `${passed}/${results.length - skipped} passed${skipped ? `, ${skipped} skipped` : ""}${failed ? `, ${failed} FAILED` : ""}`;
-}
-
-// The short report: the summary line, then one line per failed check (id, issue, check, detail).
-function reportLines(tag, report) {
-  const oneLine = (text) => String(text).replace(/\s*\n\s*/g, " ⏎ ");
-  return [
-    `[${tag}] self-test: ${report.summary}`,
-    ...report.results.filter((r) => r.pass === false).map((r) => `  ✗ ${r.id} ${r.issue} ${r.check} — ${oneLine(r.detail)}`),
-  ];
-}
-
-// Logs the lines and copies them, or with `full` the whole report as JSON.
-async function printReport(lines, report, { full = false } = {}) {
-  console.log(lines.join("\n"));
-  const copied = !!(await writeClipboard(full ? JSON.stringify(report, null, 2) : lines.join("\n")));
-  if (!copied) console.warn(`[${P}] Couldn't copy the report: it's the return value.`);
-}
-
 let selfTestRunning = false;
 
 // Runs `suite({ check, skip })`, which returns the environment block. `quiet` (Gradient Bars)
@@ -144,7 +111,7 @@ export async function runSelfTest(options = {}, suite) {
     selfTestRunning = false;
   }
   const report = { summary: summarise(results), environment, results };
-  if (!options.quiet) await printReport(reportLines(P, report), report, options);
+  if (!options.quiet) await printReport(P, reportLines(P, report), report, options);
   return report;
 }
 
