@@ -12,6 +12,7 @@ const mode = process.argv[2] ?? "--build";
 
 const TARGETS = [
   { id: "gpb", entry: "src/gpb/index.js", out: "dist/gradientProgressBar.js" },
+  { id: "gcb", entry: "src/gcb/index.js", out: "dist/gradientConnectBar.js" },
 ];
 
 const common = {
