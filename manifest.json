@@ -1,0 +1,29 @@
+[
+  {
+    "name": "Gradient Progress Bar",
+    "description": "Recolour the song progress bar with a solid colour or a multi-stop gradient. Works alongside themes and the waveform extension.",
+    "preview": "previews/gradient-progress-bar.png",
+    "main": "dist/gradientProgressBar.js",
+    "readme": "README.md",
+    "authors": [{ "name": "VoidCrowned", "url": "https://github.com/VoidCrowned" }],
+    "tags": ["progress bar", "colour", "gradient", "playback"]
+  },
+  {
+    "name": "Gradient Connect Bar",
+    "description": "Recolour the Connect bar (\"Playing on …\") with a solid colour or a multi-stop gradient, with text that stays readable. Works alongside themes and Gradient Progress Bar.",
+    "preview": "previews/gradient-connect-bar.png",
+    "main": "dist/gradientConnectBar.js",
+    "readme": "README.md",
+    "authors": [{ "name": "VoidCrowned", "url": "https://github.com/VoidCrowned" }],
+    "tags": ["connect", "colour", "gradient", "playback"]
+  },
+  {
+    "name": "Gradient Bars",
+    "description": "Gradient Progress Bar and Gradient Connect Bar in one: recolour the song progress bar and the Connect bar with a solid colour or a multi-stop gradient. Install this instead of both.",
+    "preview": "previews/gradient-bars.png",
+    "main": "dist/gradientBars.js",
+    "readme": "README.md",
+    "authors": [{ "name": "VoidCrowned", "url": "https://github.com/VoidCrowned" }],
+    "tags": ["progress bar", "connect", "colour", "gradient", "playback"]
+  }
+]
