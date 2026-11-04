@@ -1,0 +1,36 @@
+name: Build
+
+# dist/ is committed: the Marketplace loads the extensions from the repository. This fails when
+# a push or pull request changes src/ without the matching npm run build, or when the build's own
+# checks fail (scripts/build.mjs).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - run: npm ci && npm run build
+
+      - name: dist/ matches src/
+        run: |
+          if [ -n "$(git status --porcelain -- dist)" ]; then
+            git status --short -- dist
+            git diff --stat -- dist
+            echo "::error::dist/ is out of date. Run npm run build and commit dist/."
+            exit 1
+          fi
