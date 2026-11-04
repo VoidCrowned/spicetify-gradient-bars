@@ -1,0 +1,15 @@
+{
+  "name": "spicetify-gradient-bars",
+  "private": true,
+  "description": "Gradient Progress Bar, Gradient Connect Bar and Gradient Bars: Spicetify extensions",
+  "license": "WTFPL",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "check": "node scripts/build.mjs --check"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
