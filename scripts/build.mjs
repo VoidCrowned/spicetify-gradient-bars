@@ -1,7 +1,9 @@
 // Builds dist/ from src/: one self-contained, unminified IIFE per extension.
 //   npm run build   write dist/
-//   npm run watch   rebuild whenever src/ changes
 //   npm run check   build in memory; fail if dist/ is out of date or a build check fails
+//   npm run dev     write dev/ (gitignored): the same code plus an inline source map, so devtools
+//                   shows src/ with its comments
+//   npm run watch   like dev, and again whenever src/ changes
 //
 // src/shared/ is written once and built into each extension: its modules import the extension's
 // own names from "ext:config" and "ext:hooks", which resolve to src/<id>/config.js and hooks.js.
@@ -26,12 +28,11 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const mode = process.argv[2] ?? "--build";
+// dev/ gets the same code as dist/ plus a source map; dist/ stays without comments and maps.
+const DEV = mode === "--dev" || mode === "--watch";
 
-const OUT = {
-  gpb: "dist/gradientProgressBar.js",
-  gcb: "dist/gradientConnectBar.js",
-  gb: "dist/gradientBars.js",
-};
+const FILES = { gpb: "gradientProgressBar.js", gcb: "gradientConnectBar.js", gb: "gradientBars.js" };
+const OUT = Object.fromEntries(Object.entries(FILES).map(([id, file]) => [id, `${DEV ? "dev" : "dist"}/${file}`]));
 
 const DESCRIPTIONS = {
   gpb: "Recolours the song progress bar with a solid colour or a multi-stop gradient.",
@@ -51,6 +52,7 @@ const configValue = (id, name) => fs.readFileSync(path.join(root, "src", id, "co
 const sha256 = (text) => crypto.createHash("sha256").update(text).digest("hex");
 const parse = (text) => acorn.parse(text, { ecmaVersion: "latest", ranges: true });
 
+// A bundle's text and, in a dev build, its source map (sources named "spicetify-gradient-bars/src/…").
 async function bundle(id, copy) {
   const result = await esbuild.build({
     entryPoints: [path.join(root, "src", id, "index.js")],
@@ -62,12 +64,19 @@ async function bundle(id, copy) {
     write: false,
     logLevel: "warning",
     plugins: [extModules(id)],
+    ...(DEV && { sourcemap: "external", sourcesContent: true, outfile: path.join(root, "dev", "bundle.js") }),
   });
-  let text = result.outputFiles[0].text.replaceAll('"__COPY__"', JSON.stringify(copy));
+  const js = result.outputFiles.find((file) => !file.path.endsWith(".map"));
+  const map = result.outputFiles.find((file) => file.path.endsWith(".map"));
+  // Filling in the placeholders only shifts the columns after them on their own line.
+  let text = js.text.replaceAll('"__COPY__"', JSON.stringify(copy));
   // The shared top-bar block's hash, as the self-test computes it: joinGradientBars() as built.
   const block = functionText(text, "joinGradientBars");
   if (block) text = text.replace('"__SHARED_ENTRY_SHA256__"', JSON.stringify(sha256(block)));
-  return text;
+  if (!map) return { text };
+  const parsed = JSON.parse(map.text);
+  parsed.sources = parsed.sources.map((source) => `spicetify-gradient-bars/${source.replace(/^(\.\.\/)+/, "")}`);
+  return { text, map: parsed };
 }
 
 // The source text of the top-level function `name` in a bundle, or null.
@@ -94,22 +103,110 @@ function header(id, lines) {
   ].map((line) => `// ${line}`.trimEnd()).join("\n") + "\n\n";
 }
 
+// Joins a file from pieces (bundles, and plain text without a map: headers, separators). A dev
+// build ends the file with one inline source map that covers every bundle at its line.
+function join(pieces) {
+  const text = pieces.map((piece) => piece.text).join("");
+  if (!DEV) return text;
+  const parts = [];
+  let line = 0;
+  for (const piece of pieces) {
+    if (piece.map) parts.push({ line, map: piece.map });
+    line += piece.text.split("\n").length - 1;
+  }
+  const map = Buffer.from(JSON.stringify(mergeMaps(parts))).toString("base64");
+  return `${text}//# sourceMappingURL=data:application/json;charset=utf-8;base64,${map}\n`;
+}
+
 async function buildAll() {
   const files = new Map();
   const gpb = await bundle("gpb", "gpb");
   const gcb = await bundle("gcb", "gcb");
-  files.set(OUT.gpb, header("gpb", ["Built from src/shared/ and src/gpb/ with esbuild: edit those, then run npm run build."]) + gpb);
-  files.set(OUT.gcb, header("gcb", ["Built from src/shared/ and src/gcb/ with esbuild: edit those, then run npm run build."]) + gcb);
+  files.set(OUT.gpb, join([{ text: header("gpb", ["Built from src/shared/ and src/gpb/ with esbuild: edit those, then run npm run build."]) }, gpb]));
+  files.set(OUT.gcb, join([{ text: header("gcb", ["Built from src/shared/ and src/gcb/ with esbuild: edit those, then run npm run build."]) }, gcb]));
   const parts = [
     ["Gradient Progress Bar", await bundle("gpb", "gb")],
     ["Gradient Connect Bar", await bundle("gcb", "gb")],
     ["Gradient Bars: window.__gb", await bundle("gb", "gb")],
   ];
-  files.set(OUT.gb, header("gb", [
-    `Contains Gradient Progress Bar ${configValue("gpb", "VERSION")} and Gradient Connect Bar ${configValue("gcb", "VERSION")}, each as built`,
-    "for its own file, then window.__gb. Built from src/ with esbuild: edit that, then run npm run build.",
-  ]) + parts.map(([name, text]) => `// ── ${name} ${"─".repeat(Math.max(4, 96 - name.length))}\n${text}`).join("\n"));
+  files.set(OUT.gb, join([
+    { text: header("gb", [
+      `Contains Gradient Progress Bar ${configValue("gpb", "VERSION")} and Gradient Connect Bar ${configValue("gcb", "VERSION")}, each as built`,
+      "for its own file, then window.__gb. Built from src/ with esbuild: edit that, then run npm run build.",
+    ]) },
+    ...parts.flatMap(([name, part], i) => [{ text: `${i ? "\n" : ""}// ── ${name} ${"─".repeat(Math.max(4, 96 - name.length))}\n` }, part]),
+  ]));
   return files;
+}
+
+// Source maps for dev/: several maps merged into one flat map, each shifted to its line in the
+// file. Flat rather than an index map ("sections"), which not every devtools version reads.
+const BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+// "mappings" → lines of segments with absolute values [column, source, sourceLine, sourceColumn, name?].
+function decodeMappings(mappings) {
+  const state = [0, 0, 0, 0, 0];
+  return mappings.split(";").map((lineText) => {
+    state[0] = 0;
+    return (lineText ? lineText.split(",") : []).map((segmentText) => {
+      const values = [];
+      let value = 0, shift = 0;
+      for (const char of segmentText) {
+        const digit = BASE64.indexOf(char);
+        value += (digit & 31) << shift;
+        if (digit & 32) shift += 5;
+        else {
+          values.push(value & 1 ? -(value >>> 1) : value >>> 1);
+          value = shift = 0;
+        }
+      }
+      values.forEach((delta, i) => (state[i] += delta));
+      return state.slice(0, values.length);
+    });
+  });
+}
+
+function encodeVlq(value) {
+  let rest = value < 0 ? (-value << 1) | 1 : value << 1;
+  let out = "";
+  do {
+    const digit = rest & 31;
+    rest >>>= 5;
+    out += BASE64[rest ? digit | 32 : digit];
+  } while (rest);
+  return out;
+}
+
+function encodeMappings(lines) {
+  const state = [0, 0, 0, 0, 0];
+  return Array.from(lines, (segments = []) => {
+    state[0] = 0;
+    return segments.map((segment) => segment.map((value, i) => {
+      const delta = value - state[i];
+      state[i] = value;
+      return encodeVlq(delta);
+    }).join("")).join(",");
+  }).join(";");
+}
+
+function mergeMaps(parts) {
+  const sources = [], sourcesContent = [], names = [], lines = [];
+  const indexOf = (list, item) => (list.includes(item) ? list.indexOf(item) : list.push(item) - 1);
+  for (const { line, map } of parts) {
+    const sourceIndex = map.sources.map((source, i) => {
+      if (!sources.includes(source)) sourcesContent.push(map.sourcesContent?.[i] ?? null);
+      return indexOf(sources, source);
+    });
+    const nameIndex = (map.names ?? []).map((name) => indexOf(names, name));
+    decodeMappings(map.mappings).forEach((segments, i) => {
+      lines[line + i] = segments.map(([column, source, sourceLine, sourceColumn, name]) => [
+        column,
+        ...(source === undefined ? [] : [sourceIndex[source], sourceLine, sourceColumn]),
+        ...(name === undefined ? [] : [nameIndex[name]]),
+      ]);
+    });
+  }
+  return { version: 3, sources, sourcesContent, names, mappings: encodeMappings(lines) };
 }
 
 const GLOBALS = new Set(("window document console navigator location Spicetify innerWidth innerHeight setTimeout clearTimeout " +
@@ -158,7 +255,7 @@ function buildProblems(files) {
 
 async function run() {
   const files = await buildAll();
-  const problems = buildProblems(files);
+  const problems = buildProblems(new Map([...files].map(([out, text]) => [out, text.replace(/\/\/# sourceMappingURL=.*\n$/, "")])));
   for (const problem of problems) console.error(`build check: ${problem}`);
   if (mode === "--check") {
     const stale = [...files].filter(([out, text]) => {

@@ -10,13 +10,15 @@ You need Node.js (LTS) and Spicetify with devtools (`spicetify enable-devtools`)
 
 ```powershell
 npm ci
-npm run watch      # rebuilds dist/ whenever src/ changes
+npm run watch      # builds dev/ whenever src/ changes
 ```
 
-Link the built file into Spicetify's `Extensions` folder once (Developer Mode lets `mklink` run without admin), register it and apply:
+`dev/` (not committed) holds the same code as `dist/` plus an inline source map, so devtools shows the files in `src/` with their comments. `npm run dev` builds it once, `npm run build` writes `dist/`.
+
+Link the dev file into Spicetify's `Extensions` folder once (Developer Mode lets `mklink` run without admin), register it and apply:
 
 ```powershell
-cmd /c mklink "$env:APPDATA\spicetify\Extensions\gradientBars.js" "<repo>\dist\gradientBars.js"
+cmd /c mklink "$env:APPDATA\spicetify\Extensions\gradientBars.js" "<repo>\dev\gradientBars.js"
 spicetify config extensions gradientBars.js
 spicetify apply
 ```
