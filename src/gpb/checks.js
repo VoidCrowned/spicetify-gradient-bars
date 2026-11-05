@@ -10,7 +10,7 @@ import { HEX_COPIED_MS, HEX_COPY_LABEL, copyHex, pickerHsv } from "../shared/pic
 import { APPLY_LABEL, COPIED_LABEL, COPIED_MS, COPY_HINT, EXPORT_LABEL, EXPORT_TITLE, IMPORT_ERROR, PREVIEW_CODE_MESSAGE, SAVE_FULL_LABEL, UNDO_MS, chipEl, copyCode, pendingUndo, renderChips } from "../shared/presets-ui.js";
 import { BUILT_IN_PRESETS, addPreset, deletePreset, loadPresets, presetSettings, presets, renamePreset, sameSettings, savePresets, setPresets, uniqueName, updatePreset } from "../shared/presets.js";
 import { RESET_CONFIRM_LABEL, RESET_CONFIRM_MS } from "../shared/reset.js";
-import { BLUE, GREEN, PROBE, RED, computedHex, custom, styleText, theme, tick } from "../shared/selftest.js";
+import { BLUE, GREEN, PROBE, RED, computedHex, custom, styleText, theme, tick, waitFor, withoutTransitions } from "../shared/selftest.js";
 import { loadSettings, setSettings, settings, update } from "../shared/settings.js";
 import { api, sleep } from "../shared/startup.js";
 import { STOP_GAP, closePopover, dotEl, popover, selectStop } from "../shared/stop-editor.js";
@@ -1214,22 +1214,24 @@ export async function runChecks(check, rootStyle, restoreButton) {
   check(40, "No --spice-rgb-button in the modal CSS (Hazy leaves it stale)", !modalCss().includes("--spice-rgb-button"),
     modalCss().match(/[^\n]*--spice-rgb-button[^\n]*/)?.[0] ?? "not used");
   const fmt = (rgb) => (rgb ? `rgb(${rgb.slice(0, 3).map(Math.round).join(", ")}${rgb[3] < 1 ? ` / ${rgb[3]}` : ""})` : "unparsed");
-  for (const probe of ["#123456", "#ffe680"]) {
-    rootStyle.setProperty("--spice-button", probe, "important");
-    await sleep(250); // the :root observer, then the button's background-color transition (.15 s)
-    const button = modeBtn("anchored");
-    const bg = parseRgb(getComputedStyle(button).backgroundColor);
-    const label = parseRgb(getComputedStyle(button).color);
-    const options = { "--spice-text": computedRgb(m.modes, "var(--spice-text)"), "--spice-main": computedRgb(m.modes, "var(--spice-main)") };
-    const want = hexToRgb(probe);
-    const [best, bestRgb] = Object.entries(options).sort(([, a], [, b]) => (b ? contrast(b, want) : 0) - (a ? contrast(a, want) : 0))[0];
-    const same = (a, b) => !!(a && b) && a.slice(0, 3).every((v, i) => Math.abs(v - b[i]) <= 1);
-    const ratio = label ? contrast(label, want) : 0;
-    check(43, `Checked Spread button is filled with a runtime --spice-button (${probe}, opaque); its label uses the higher-contrast option, ≥ 4.5:1`,
-      same(bg, want) && bg[3] === 1 && same(label, bestRgb) && label[3] === 1 && ratio >= 4.5,
-      `background ${fmt(bg)}, label ${fmt(label)} (${ratio.toFixed(2)}:1), expected ${best} ${fmt(bestRgb)}; ` +
-        Object.entries(options).map(([k, v]) => `${k} ${v ? contrast(v, want).toFixed(2) : "?"}:1`).join(", "));
-  }
+  await withoutTransitions(modeNodes, async () => {
+    for (const probe of ["#123456", "#ffe680"]) {
+      rootStyle.setProperty("--spice-button", probe, "important");
+      await sleep(250); // the :root observer and the re-render; the buttons' fade is off for this check (#12)
+      const button = modeBtn("anchored");
+      const bg = parseRgb(getComputedStyle(button).backgroundColor);
+      const label = parseRgb(getComputedStyle(button).color);
+      const options = { "--spice-text": computedRgb(m.modes, "var(--spice-text)"), "--spice-main": computedRgb(m.modes, "var(--spice-main)") };
+      const want = hexToRgb(probe);
+      const [best, bestRgb] = Object.entries(options).sort(([, a], [, b]) => (b ? contrast(b, want) : 0) - (a ? contrast(a, want) : 0))[0];
+      const same = (a, b) => !!(a && b) && a.slice(0, 3).every((v, i) => Math.abs(v - b[i]) <= 1);
+      const ratio = label ? contrast(label, want) : 0;
+      check(43, `Checked Spread button is filled with a runtime --spice-button (${probe}, opaque); its label uses the higher-contrast option, ≥ 4.5:1`,
+        same(bg, want) && bg[3] === 1 && same(label, bestRgb) && label[3] === 1 && ratio >= 4.5,
+        `background ${fmt(bg)}, label ${fmt(label)} (${ratio.toFixed(2)}:1), expected ${best} ${fmt(bestRgb)}; ` +
+          Object.entries(options).map(([k, v]) => `${k} ${v ? contrast(v, want).toFixed(2) : "?"}:1`).join(", "));
+    }
+  });
   restoreButton();
   await sleep(250);
   realClick(modeBtn("slide"));
@@ -1836,7 +1838,7 @@ export async function runChecks(check, rootStyle, restoreButton) {
     stubClipboard({ api: "fail", write: "fail", exec: "fail" });
     const copyNode = m.exportButton;
     realClick(copyNode);
-    await sleep(50);
+    await waitFor(() => !m.codeFallback.hidden);
     const out = m.codeOutput;
     check(54, "When all three fail, the code shows in a read-only field, selected, with the hint; the button reads 'Export'",
       tierLog.join() === "ClipboardAPI,writeText,execCommand" && !m.codeFallback.hidden && out.readOnly && out.value === code &&

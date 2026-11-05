@@ -2137,6 +2137,20 @@ ${OPTION_ROW_CSS.trim()}
   var theme = (id) => ({ id, kind: "theme" });
   var styleText = () => document.getElementById(`${P}-style`)?.textContent ?? null;
   var computedHex = (el, prop) => el ? toHex(getComputedStyle(el)[prop]) : null;
+  async function waitFor(cond, timeout = 1e3) {
+    const end = performance.now() + timeout;
+    while (!cond() && performance.now() < end) await sleep(10);
+    return cond();
+  }
+  async function withoutTransitions(elements, fn) {
+    const before = elements.map((el) => [el, el.getAttribute("style")]);
+    for (const el of elements) el.style.setProperty("transition", "none", "important");
+    try {
+      return await fn();
+    } finally {
+      for (const [el, style] of before) style === null ? el.removeAttribute("style") : el.setAttribute("style", style);
+    }
+  }
   var BAR_FILES = [FILE, "gradientBars.js"];
   var fileOf2 = (src) => src?.split(/[?#]/)[0].split("/").pop() ?? null;
   var loadedCopies = () => [...document.querySelectorAll("script[src]")].map((el) => el.src).filter((src) => BAR_FILES.includes(fileOf2(src)));
@@ -2165,9 +2179,27 @@ ${OPTION_ROW_CSS.trim()}
     const savedRaw = Spicetify.LocalStorage.get(STORAGE_KEY);
     const savedPresets = structuredClone(presets);
     const savedPresetsRaw = Spicetify.LocalStorage.get(PRESETS_KEY);
-    const rootStyle = document.documentElement.style;
-    const savedButton = [rootStyle.getPropertyValue("--spice-button"), rootStyle.getPropertyPriority("--spice-button")];
-    const restoreButton = () => savedButton[0] ? rootStyle.setProperty("--spice-button", savedButton[0], savedButton[1]) : rootStyle.removeProperty("--spice-button");
+    const style = document.documentElement.style;
+    const savedButton = [style.getPropertyValue("--spice-button"), style.getPropertyPriority("--spice-button")];
+    let probe = null;
+    const guard = new MutationObserver(() => {
+      if (probe && style.getPropertyValue("--spice-button").trim() !== probe) style.setProperty("--spice-button", probe, "important");
+    });
+    const rootStyle = {
+      setProperty(name, value, priority) {
+        if (name === "--spice-button") {
+          probe = value;
+          guard.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+        }
+        style.setProperty(name, value, priority);
+      }
+    };
+    const restoreButton = () => {
+      probe = null;
+      guard.disconnect();
+      if (savedButton[0]) style.setProperty("--spice-button", savedButton[0], savedButton[1]);
+      else style.removeProperty("--spice-button");
+    };
     const restore = () => {
       closeOpenModal();
       restoreButton();
@@ -3686,24 +3718,26 @@ ${REORDER_HINT}`)),
       modalCss().match(/[^\n]*--spice-rgb-button[^\n]*/)?.[0] ?? "not used"
     );
     const fmt = (rgb) => rgb ? `rgb(${rgb.slice(0, 3).map(Math.round).join(", ")}${rgb[3] < 1 ? ` / ${rgb[3]}` : ""})` : "unparsed";
-    for (const probe of ["#123456", "#ffe680"]) {
-      rootStyle.setProperty("--spice-button", probe, "important");
-      await sleep(250);
-      const button = modeBtn("anchored");
-      const bg = parseRgb(getComputedStyle(button).backgroundColor);
-      const label = parseRgb(getComputedStyle(button).color);
-      const options = { "--spice-text": computedRgb(m.modes, "var(--spice-text)"), "--spice-main": computedRgb(m.modes, "var(--spice-main)") };
-      const want = hexToRgb(probe);
-      const [best, bestRgb] = Object.entries(options).sort(([, a], [, b]) => (b ? contrast(b, want) : 0) - (a ? contrast(a, want) : 0))[0];
-      const same = (a, b) => !!(a && b) && a.slice(0, 3).every((v, i) => Math.abs(v - b[i]) <= 1);
-      const ratio = label ? contrast(label, want) : 0;
-      check(
-        43,
-        `Checked Spread button is filled with a runtime --spice-button (${probe}, opaque); its label uses the higher-contrast option, ≥ 4.5:1`,
-        same(bg, want) && bg[3] === 1 && same(label, bestRgb) && label[3] === 1 && ratio >= 4.5,
-        `background ${fmt(bg)}, label ${fmt(label)} (${ratio.toFixed(2)}:1), expected ${best} ${fmt(bestRgb)}; ` + Object.entries(options).map(([k, v]) => `${k} ${v ? contrast(v, want).toFixed(2) : "?"}:1`).join(", ")
-      );
-    }
+    await withoutTransitions(modeNodes, async () => {
+      for (const probe of ["#123456", "#ffe680"]) {
+        rootStyle.setProperty("--spice-button", probe, "important");
+        await sleep(250);
+        const button = modeBtn("anchored");
+        const bg = parseRgb(getComputedStyle(button).backgroundColor);
+        const label = parseRgb(getComputedStyle(button).color);
+        const options = { "--spice-text": computedRgb(m.modes, "var(--spice-text)"), "--spice-main": computedRgb(m.modes, "var(--spice-main)") };
+        const want = hexToRgb(probe);
+        const [best, bestRgb] = Object.entries(options).sort(([, a], [, b]) => (b ? contrast(b, want) : 0) - (a ? contrast(a, want) : 0))[0];
+        const same = (a, b) => !!(a && b) && a.slice(0, 3).every((v, i) => Math.abs(v - b[i]) <= 1);
+        const ratio = label ? contrast(label, want) : 0;
+        check(
+          43,
+          `Checked Spread button is filled with a runtime --spice-button (${probe}, opaque); its label uses the higher-contrast option, ≥ 4.5:1`,
+          same(bg, want) && bg[3] === 1 && same(label, bestRgb) && label[3] === 1 && ratio >= 4.5,
+          `background ${fmt(bg)}, label ${fmt(label)} (${ratio.toFixed(2)}:1), expected ${best} ${fmt(bestRgb)}; ` + Object.entries(options).map(([k, v]) => `${k} ${v ? contrast(v, want).toFixed(2) : "?"}:1`).join(", ")
+        );
+      }
+    });
     restoreButton();
     await sleep(250);
     realClick(modeBtn("slide"));
@@ -4418,7 +4452,7 @@ ${threeColours}	 `), "");
       stubClipboard({ api: "fail", write: "fail", exec: "fail" });
       const copyNode = m.exportButton;
       realClick(copyNode);
-      await sleep(50);
+      await waitFor(() => !m.codeFallback.hidden);
       const out = m.codeOutput;
       check(
         54,
@@ -6982,6 +7016,20 @@ ${OPTION_ROW_CSS.trim()}
   var theme = (id) => ({ id, kind: "theme" });
   var styleText = () => document.getElementById(`${P}-style`)?.textContent ?? null;
   var computedHex = (el, prop) => el ? toHex(getComputedStyle(el)[prop]) : null;
+  async function waitFor(cond, timeout = 1e3) {
+    const end = performance.now() + timeout;
+    while (!cond() && performance.now() < end) await sleep(10);
+    return cond();
+  }
+  async function withoutTransitions(elements, fn) {
+    const before = elements.map((el) => [el, el.getAttribute("style")]);
+    for (const el of elements) el.style.setProperty("transition", "none", "important");
+    try {
+      return await fn();
+    } finally {
+      for (const [el, style] of before) style === null ? el.removeAttribute("style") : el.setAttribute("style", style);
+    }
+  }
   var BAR_FILES = [FILE, "gradientBars.js"];
   var fileOf2 = (src) => src?.split(/[?#]/)[0].split("/").pop() ?? null;
   var loadedCopies = () => [...document.querySelectorAll("script[src]")].map((el) => el.src).filter((src) => BAR_FILES.includes(fileOf2(src)));
@@ -7010,9 +7058,27 @@ ${OPTION_ROW_CSS.trim()}
     const savedRaw = Spicetify.LocalStorage.get(STORAGE_KEY);
     const savedPresets = structuredClone(presets);
     const savedPresetsRaw = Spicetify.LocalStorage.get(PRESETS_KEY);
-    const rootStyle = document.documentElement.style;
-    const savedButton = [rootStyle.getPropertyValue("--spice-button"), rootStyle.getPropertyPriority("--spice-button")];
-    const restoreButton = () => savedButton[0] ? rootStyle.setProperty("--spice-button", savedButton[0], savedButton[1]) : rootStyle.removeProperty("--spice-button");
+    const style = document.documentElement.style;
+    const savedButton = [style.getPropertyValue("--spice-button"), style.getPropertyPriority("--spice-button")];
+    let probe = null;
+    const guard = new MutationObserver(() => {
+      if (probe && style.getPropertyValue("--spice-button").trim() !== probe) style.setProperty("--spice-button", probe, "important");
+    });
+    const rootStyle = {
+      setProperty(name, value, priority) {
+        if (name === "--spice-button") {
+          probe = value;
+          guard.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+        }
+        style.setProperty(name, value, priority);
+      }
+    };
+    const restoreButton = () => {
+      probe = null;
+      guard.disconnect();
+      if (savedButton[0]) style.setProperty("--spice-button", savedButton[0], savedButton[1]);
+      else style.removeProperty("--spice-button");
+    };
     const restore = () => {
       closeOpenModal();
       restoreButton();
@@ -8254,18 +8320,19 @@ ${OPTION_ROW_CSS.trim()}
     check(11, "The chosen text colour is saved", storedText === "black", `stored ${storedText}`);
     realClick(m.textButtons[0]);
     const fillProblems = [];
-    for (const probe of ["#123456", "#ffe680"]) {
-      rootStyle.setProperty("--spice-button", probe, "important");
-      await sleep(250);
-      const checked = m.textButtons.find((b) => b.getAttribute("aria-checked") === "true");
-      for (const animation of checked.getAnimations()) animation.finish();
-      const fill = parseRgb(getComputedStyle(checked).backgroundColor);
-      const label = parseRgb(getComputedStyle(checked).color);
-      const want = hexToRgb(probe);
-      const ratio = label ? contrast(label, want) : 0;
-      if (!fill || !fill.every((v, i) => Math.abs(v - want[i]) <= 1) || ratio < 4.5)
-        fillProblems.push(`${probe}: fill ${getComputedStyle(checked).backgroundColor}, label ${getComputedStyle(checked).color} (${ratio.toFixed(2)}:1)`);
-    }
+    await withoutTransitions(m.textButtons, async () => {
+      for (const probe of ["#123456", "#ffe680"]) {
+        rootStyle.setProperty("--spice-button", probe, "important");
+        await sleep(250);
+        const checked = m.textButtons.find((b) => b.getAttribute("aria-checked") === "true");
+        const fill = parseRgb(getComputedStyle(checked).backgroundColor);
+        const label = parseRgb(getComputedStyle(checked).color);
+        const want = hexToRgb(probe);
+        const ratio = label ? contrast(label, want) : 0;
+        if (!fill || !fill.every((v, i) => Math.abs(v - want[i]) <= 1) || ratio < 4.5)
+          fillProblems.push(`${probe}: fill ${getComputedStyle(checked).backgroundColor}, label ${getComputedStyle(checked).color} (${ratio.toFixed(2)}:1)`);
+      }
+    });
     restoreButton();
     await sleep(250);
     check(
@@ -8785,7 +8852,7 @@ ${FIXTURES.gcbThemeWhite}	 `) && !!decodeCode(` ${FIXTURES.gpbVoid} `), "");
       const viaExec = await copyCode(m);
       stubClipboard({ apiTier: "fail", write: "fail", exec: "fail" });
       realClick(m.exportButton);
-      await sleep(50);
+      await waitFor(() => !m.codeFallback.hidden);
       check(
         36,
         `Export: 'Export' again after ${COPIED_MS / 1e3} s; execCommand when both async tiers fail; the selected code field when all three fail`,

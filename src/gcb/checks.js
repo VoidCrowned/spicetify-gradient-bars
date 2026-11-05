@@ -10,7 +10,7 @@ import { pickerHsv } from "../shared/picker.js";
 import { APPLY_LABEL, COPIED_LABEL, COPIED_MS, EXPORT_LABEL, EXPORT_TITLE, IMPORT_ERROR, PREVIEW_CODE_MESSAGE, SAVE_FULL_LABEL, chipEl, copyCode, pendingUndo, renderChips } from "../shared/presets-ui.js";
 import { BUILT_IN_PRESETS, addPreset, deletePreset, loadPresets, matchesPreset, presetSettings, presets, renamePreset, sameSettings, savePresets, setPresets, uniqueName, updatePreset } from "../shared/presets.js";
 import { RESET_CONFIRM_LABEL, RESET_CONFIRM_MS } from "../shared/reset.js";
-import { BLUE, GREEN, PROBE, RED, computedHex, custom, styleText, theme, tick } from "../shared/selftest.js";
+import { BLUE, GREEN, PROBE, RED, computedHex, custom, styleText, theme, tick, waitFor, withoutTransitions } from "../shared/selftest.js";
 import { loadSettings, setSettings, settings, update } from "../shared/settings.js";
 import { api, sleep, startup } from "../shared/startup.js";
 import { STOP_GAP, closePopover, dotEl, popover, selectStop } from "../shared/stop-editor.js";
@@ -955,18 +955,19 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
   // The checked button is filled with the live --spice-button; its label takes whichever of
   // --spice-text and --spice-main contrasts more (GPB #43). A dark and a light probe.
   const fillProblems = [];
-  for (const probe of ["#123456", "#ffe680"]) {
-    rootStyle.setProperty("--spice-button", probe, "important");
-    await sleep(250); // the :root observer, then the background-color transition (.15 s)
-    const checked = m.textButtons.find((b) => b.getAttribute("aria-checked") === "true");
-    for (const animation of checked.getAnimations()) animation.finish(); // our own button's fade, not Spotify's
-    const fill = parseRgb(getComputedStyle(checked).backgroundColor);
-    const label = parseRgb(getComputedStyle(checked).color);
-    const want = hexToRgb(probe);
-    const ratio = label ? contrast(label, want) : 0;
-    if (!fill || !fill.every((v, i) => Math.abs(v - want[i]) <= 1) || ratio < 4.5) // parseRgb() only takes opaque colours
-      fillProblems.push(`${probe}: fill ${getComputedStyle(checked).backgroundColor}, label ${getComputedStyle(checked).color} (${ratio.toFixed(2)}:1)`);
-  }
+  await withoutTransitions(m.textButtons, async () => {
+    for (const probe of ["#123456", "#ffe680"]) {
+      rootStyle.setProperty("--spice-button", probe, "important");
+      await sleep(250); // the :root observer and the re-render; the buttons' fade is off for this check (#12)
+      const checked = m.textButtons.find((b) => b.getAttribute("aria-checked") === "true");
+      const fill = parseRgb(getComputedStyle(checked).backgroundColor);
+      const label = parseRgb(getComputedStyle(checked).color);
+      const want = hexToRgb(probe);
+      const ratio = label ? contrast(label, want) : 0;
+      if (!fill || !fill.every((v, i) => Math.abs(v - want[i]) <= 1) || ratio < 4.5) // parseRgb() only takes opaque colours
+        fillProblems.push(`${probe}: fill ${getComputedStyle(checked).backgroundColor}, label ${getComputedStyle(checked).color} (${ratio.toFixed(2)}:1)`);
+    }
+  });
   restoreButton();
   await sleep(250);
   check(11, "The checked text colour button is filled with a runtime --spice-button; its label reaches 4.5:1 on a dark and a light probe",
@@ -1409,7 +1410,7 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
     const viaExec = await copyCode(m);
     stubClipboard({ apiTier: "fail", write: "fail", exec: "fail" });
     realClick(m.exportButton);
-    await sleep(50);
+    await waitFor(() => !m.codeFallback.hidden);
     check(36, `Export: 'Export' again after ${COPIED_MS / 1000} s; execCommand when both async tiers fail; the selected code field when all three fail`,
       backToExport && viaExec === "execCommand" && tierLog.join() === "ClipboardAPI,writeText,execCommand" && !m.codeFallback.hidden &&
         m.codeOutput.value === FIXTURES.gcbVoidAuto && document.activeElement === m.codeOutput && showsExport(),

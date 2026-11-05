@@ -48,6 +48,7 @@ Tested with [Hazy](https://github.com/Astromations/Hazy) (the theme colour follo
 ## Troubleshooting
 
 - **After a Spotify update the bars are back to normal:** updates remove Spicetify's patch. Run `spicetify apply`.
+- **A setting I changed just before `spicetify apply` is gone:** on Windows, `spicetify apply` force-closes Spotify (`taskkill /F`), which loses settings changed shortly before. Close Spotify normally first (*⋯* → *File* → *Exit*).
 - **Something looks wrong:** [open an issue](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/new/choose). The form says which self-test to paste ([how to open the devtools console](TESTING.md#opening-the-devtools-console)).
 
 More: [ROADMAP.md](ROADMAP.md), [CHANGELOG.md](CHANGELOG.md), [CONTRIBUTING.md](CONTRIBUTING.md).

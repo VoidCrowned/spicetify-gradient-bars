@@ -13,6 +13,7 @@ import { closeModal, modal } from "./modal.js";
 import { presets, setPresets } from "./presets.js";
 import { createResults, printReport, reportLines, summarise } from "./report.js";
 import { cancelSave, setSettings, settings } from "./settings.js";
+import { sleep } from "./startup.js";
 
 export const RED = "#ff0000";
 export const GREEN = "#00ff00";
@@ -24,6 +25,28 @@ export const custom = (id, color) => ({ id, kind: "custom", color });
 export const theme = (id) => ({ id, kind: "theme" });
 export const styleText = () => document.getElementById(`${P}-style`)?.textContent ?? null;
 export const computedHex = (el, prop) => (el ? toHex(getComputedStyle(el)[prop]) : null);
+
+// Resolves once cond() is true, or after timeout ms; returns cond()'s last value. For checks that
+// wait on async work (clipboard tiers, re-renders), instead of a fixed sleep that can be too short
+// under load (#12).
+export async function waitFor(cond, timeout = 1000) {
+  const end = performance.now() + timeout;
+  while (!cond() && performance.now() < end) await sleep(10);
+  return cond();
+}
+
+// Runs fn with CSS transitions off on our own elements, so a computed colour read after a change
+// is the end value at once instead of a frame of a .15 s fade (a fixed wait wasn't enough under
+// load, #12). Test-only: each element's inline transition is put back afterwards.
+export async function withoutTransitions(elements, fn) {
+  const before = elements.map((el) => [el, el.getAttribute("style")]);
+  for (const el of elements) el.style.setProperty("transition", "none", "important");
+  try {
+    return await fn();
+  } finally {
+    for (const [el, style] of before) style === null ? el.removeAttribute("style") : el.setAttribute("style", style);
+  }
+}
 
 // The files that can carry this bar: its own and Gradient Bars, which runs both.
 const BAR_FILES = [FILE, "gradientBars.js"];
@@ -74,12 +97,30 @@ export function saveTestState() {
   const savedRaw = Spicetify.LocalStorage.get(STORAGE_KEY);
   const savedPresets = structuredClone(presets); // GPB #21, GCB #29
   const savedPresetsRaw = Spicetify.LocalStorage.get(PRESETS_KEY);
-  const rootStyle = document.documentElement.style;
-  const savedButton = [rootStyle.getPropertyValue("--spice-button"), rootStyle.getPropertyPriority("--spice-button")];
-  const restoreButton = () =>
-    savedButton[0]
-      ? rootStyle.setProperty("--spice-button", savedButton[0], savedButton[1])
-      : rootStyle.removeProperty("--spice-button");
+  const style = document.documentElement.style;
+  const savedButton = [style.getPropertyValue("--spice-button"), style.getPropertyPriority("--spice-button")];
+  // Checks set a probe --spice-button through rootStyle. Themes may write their own on :root at
+  // any time (Hazy on every songchange), which would replace the probe mid-check (#12), so while a
+  // probe is set, a write over it is undone at once.
+  let probe = null;
+  const guard = new MutationObserver(() => {
+    if (probe && style.getPropertyValue("--spice-button").trim() !== probe) style.setProperty("--spice-button", probe, "important");
+  });
+  const rootStyle = {
+    setProperty(name, value, priority) {
+      if (name === "--spice-button") {
+        probe = value;
+        guard.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+      }
+      style.setProperty(name, value, priority);
+    },
+  };
+  const restoreButton = () => {
+    probe = null;
+    guard.disconnect();
+    if (savedButton[0]) style.setProperty("--spice-button", savedButton[0], savedButton[1]);
+    else style.removeProperty("--spice-button");
+  };
   const restore = () => {
     closeOpenModal();
     restoreButton();
