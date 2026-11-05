@@ -10,7 +10,7 @@ My [Spicetify](https://spicetify.app) extensions that recolour Spotify's bars wi
 
 Install **either Gradient Bars or the ones you want separately, not both**. Gradient Bars uses the same settings, so you can switch without losing anything. If you do end up with both, the second copy steps aside and leaves a warning in the console.
 
-<p align="center"><img src="previews/gradient-progress-bar.png" alt="Gradient Progress Bar: a gradient song progress bar and the settings window" width="580"></p>
+<p align="center"><img src="previews/gradient-bars.png" alt="Gradient Progress Bar and Gradient Connect Bar: each bar with a gradient and its settings window" width="580"></p>
 
 ## Features
 
