@@ -1,5 +1,5 @@
 import { copyStatus } from "../shared/claim.js";
-import { menuItemUsable, menuRegistered, shared } from "../shared/entry.js";
+import { entryText, menuItemUsable, menuRegistered, shared } from "../shared/entry.js";
 import { outline, spicetifyVersion } from "../shared/selftest.js";
 import { api, startup } from "../shared/startup.js";
 import { VERSION } from "./config.js";
@@ -26,7 +26,7 @@ export function statusReport() {
     copy: copyStatus(), // which copy runs this bar: the standalone file or Gradient Bars
     phase: startup.phase,
     waitingFor: startup.waitingFor,
-    entry: startup.entry,
+    entry: entryText(),
     entryErrors: startup.entryErrors,
     error: startup.error,
     spotify: window.Spicetify?.Platform?.version ?? null,

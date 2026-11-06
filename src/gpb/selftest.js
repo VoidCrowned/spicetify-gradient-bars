@@ -3,9 +3,9 @@
 // checks.js.
 
 import { copyStatus } from "../shared/claim.js";
-import { SELF, menuItemUsable, menuRegistered, shared } from "../shared/entry.js";
+import { SELF, entryText, menuItemUsable, menuRegistered, shared } from "../shared/entry.js";
 import { presets } from "../shared/presets.js";
-import { checkDuplicateGuard, closeOpenModal, copiesDetail, fileName, forwarders, lintCss, loadedCopies, otherFixes, runSelfTest, sameFileCopies, saveTestState, spicetifyVersion } from "../shared/selftest.js";
+import { checkDuplicateGuard, checkEntryText, closeOpenModal, copiesDetail, fileName, forwarders, lintCss, loadedCopies, otherFixes, runSelfTest, sameFileCopies, saveTestState, spicetifyVersion } from "../shared/selftest.js";
 import { setSettings, update } from "../shared/settings.js";
 import { api, sleep, startup } from "../shared/startup.js";
 import { checkEntryIcon, checkSharedEntry, runChecks } from "./checks.js";
@@ -108,7 +108,7 @@ function environment() {
     eyedropper: !!window.EyeDropper, // the picker's eyedropper button exists only with it
     presets: presets.length, // own presets (GPB #21)
     spiceButton: getComputedStyle(document.documentElement).getPropertyValue("--spice-button").trim() || null,
-    entry: startup.entry,
+    entry: entryText(),
     phase: startup.phase,
     entryErrors: startup.entryErrors,
     menu: { registered: menuRegistered, menuItemUsable: menuItemUsable() }, // GPB #27; info only, never a check
@@ -129,7 +129,7 @@ export function selfTest(options) {
       // The entries can take up to 15 s to register (the profile menu waits for ReactJSX).
       for (let waited = 0; startup.phase === "registering entry point" && waited < 21000; waited += 300) await sleep(300);
       check(3, "Settings entry registered (profile menu or top bar)", startup.entry,
-        [`${startup.entry ?? "none"} (${startup.phase})`, ...startup.entryErrors, startup.error?.split("\n")[0]].filter(Boolean).join("; "));
+        [`${entryText() ?? "none"} (${startup.phase})`, ...startup.entryErrors, startup.error?.split("\n")[0]].filter(Boolean).join("; "));
       const menuApplicable = !!(api("Menu")?.Item && api("ReactJSX"));
       check(27, "Menu entry registered without throwing", !menuApplicable || menuRegistered,
         menuApplicable
@@ -153,6 +153,7 @@ export function selfTest(options) {
           ? copiesDetail(env.copies)
           : `${copies.length} copies: ${copies.join(", ") || "none found"} (running: ${SOURCE ?? "unknown"}). Keep either the Marketplace install or the local CLI install (spicetify config extensions ${fileName()}-), not both.`);
       checkDuplicateGuard(check); // #15
+      checkEntryText(check); // #6
       await checkEntryIcon(check);
       await checkSharedEntry(check);
       await runChecks(check, state.rootStyle, state.restoreButton);

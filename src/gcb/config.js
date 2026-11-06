@@ -3,7 +3,7 @@
 
 export const P = "gcb"; // prefix of every id and class, the console tag [gcb] and window.__gcb
 export const NAME = "Gradient Connect Bar"; // as in manifest.json; also the settings window's title
-export const VERSION = "1.0.0";
+export const VERSION = "1.0.1";
 export const FILE = "gradientConnectBar.js"; // the standalone file, for the copies check
 
 // Where this copy was loaded from: the Marketplace (jsDelivr) or the CLI (Extensions folder).

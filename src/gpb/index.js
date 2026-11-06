@@ -13,7 +13,7 @@
 //  6. Inert by default: with default settings the stylesheet is empty.
 
 import { COPY, claimBar } from "../shared/claim.js";
-import { joinGradientBars, registerSpicetifyEntries, setShared } from "../shared/entry.js";
+import { entryText, joinGradientBars, registerSpicetifyEntries, setShared } from "../shared/entry.js";
 import { modal, openModal } from "../shared/modal.js";
 import { loadPresets, setPresets } from "../shared/presets.js";
 import { flushSettings, loadSettings, setSettings } from "../shared/settings.js";
@@ -53,7 +53,7 @@ export async function main() {
     const extra = await registerSpicetifyEntries();
     if (extra) startup.entry += ` + ${extra}`;
     startup.phase = "ready";
-    console.log(`[gpb] v${VERSION} ready — open the settings with a ${startup.entry}.`);
+    console.log(`[gpb] v${VERSION} ready — open the settings with a ${entryText()}.`);
     if (startup.entryErrors.length) console.warn("[gpb] Spicetify entry points unavailable:", startup.entryErrors.join("; "));
   } catch (e) {
     startup.phase = "failed";

@@ -1,5 +1,5 @@
 // NAME: Gradient Connect Bar
-// VERSION: 1.0.0
+// VERSION: 1.0.1
 // AUTHOR: VoidCrowned
 // REPO: https://github.com/VoidCrowned/spicetify-gradient-bars
 // DESCRIPTION: Recolours Spotify's Connect bar ("Playing on …") with a solid colour or a multi-stop gradient.
@@ -11,7 +11,7 @@
   // src/gcb/config.js
   var P = "gcb";
   var NAME = "Gradient Connect Bar";
-  var VERSION = "1.0.0";
+  var VERSION = "1.0.1";
   var FILE = "gradientConnectBar.js";
   var SOURCE = document.currentScript?.src || null;
   var STORAGE_KEY = "gcb:settings";
@@ -2215,6 +2215,8 @@ ${OPTION_ROW_CSS.trim()}
     }
     return menuItemVerdicts.get(component);
   }
+  var MENU_ENTRY = "profile menu";
+  var entryText = (text = startup.entry, usable = menuItemUsable()) => text && (usable ? text : text.replace(MENU_ENTRY, `${MENU_ENTRY} (hidden while Spicetify's MenuItem is broken)`));
   async function registerSpicetifyEntries() {
     const entries = await Promise.all([registerMenuEntry(), registerTopbarEntry()]);
     return entries.filter(Boolean).join(" + ") || null;
@@ -2233,7 +2235,7 @@ ${OPTION_ROW_CSS.trim()}
       item.register();
       window[`__${P}`].menuItem = item;
       menuRegistered = true;
-      return menuItemUsable() ? "profile menu" : "profile menu (hidden while Spicetify's MenuItem is broken)";
+      return MENU_ENTRY;
     } catch (e) {
       startup.entryErrors.push(`Menu: ${e?.message || e}`);
       return null;
@@ -2319,6 +2321,25 @@ ${OPTION_ROW_CSS.trim()}
     const own = sameFileCopies(copies);
     const others = copies.filter((src) => !own.includes(src));
     return [own[0], ...others.map((src) => `also ${src}, one of them skipped by the conflict rule`)].join("; ");
+  }
+  function checkEntryText(check) {
+    const ISSUE = "gradient-bars#6";
+    const sample = "right-click on the bar + profile menu + top bar button";
+    const usable = entryText(sample, true);
+    const broken = entryText(sample, false);
+    check(
+      ISSUE,
+      'Entry text says "hidden" exactly when MenuItem is broken (both cases)',
+      usable === sample && broken.includes("profile menu (hidden") && entryText(null, false) === null,
+      `${usable} | ${broken}`
+    );
+    const live = entryText() ?? "";
+    check(
+      ISSUE,
+      'status().entry says "hidden" only while menuItemUsable() is false',
+      live.includes("hidden") === (menuRegistered && !menuItemUsable()),
+      `${live || "none"} (usable: ${menuItemUsable()}, registered: ${menuRegistered})`
+    );
   }
   function checkDuplicateGuard(check) {
     const ISSUE = "gradient-bars#15";
@@ -2501,7 +2522,7 @@ ${OPTION_ROW_CSS.trim()}
       // which copy runs this bar: the standalone file or Gradient Bars
       phase: startup.phase,
       waitingFor: startup.waitingFor,
-      entry: startup.entry,
+      entry: entryText(),
       error: startup.error,
       spotify: window.Spicetify?.Platform?.version ?? null,
       spicetify: spicetifyVersion(),
@@ -4450,7 +4471,7 @@ ${FIXTURES.gcbThemeWhite}	 `) && !!decodeCode(` ${FIXTURES.gpbVoid} `), "");
       spiceButton: getComputedStyle(document.documentElement).getPropertyValue("--spice-button").trim() || null,
       barBase: barBase(),
       textColour: textStatus(),
-      entry: startup.entry,
+      entry: entryText(),
       phase: startup.phase,
       entryErrors: startup.entryErrors,
       menu: { registered: menuRegistered, menuItemUsable: menuItemUsable() },
@@ -4480,6 +4501,7 @@ ${FIXTURES.gcbThemeWhite}	 `) && !!decodeCode(` ${FIXTURES.gpbVoid} `), "");
           copies.length === 1 ? copiesDetail(env.copies) : `${copies.length} copies: ${copies.join(", ") || "none found"} (running: ${SOURCE ?? "unknown"}). Keep either the Marketplace install or the local CLI install (spicetify config extensions ${fileName()}-), not both.`
         );
         checkDuplicateGuard(check);
+        checkEntryText(check);
         await checkEntries(check, skip);
         await runChecks(check, skip, state.rootStyle, state.restoreButton);
       } catch (e) {
@@ -4519,7 +4541,7 @@ ${FIXTURES.gcbThemeWhite}	 `) && !!decodeCode(` ${FIXTURES.gpbVoid} `), "");
       const extra = await registerSpicetifyEntries();
       if (extra) startup.entry += ` + ${extra}`;
       startup.phase = "ready";
-      console.log(`[gcb] v${VERSION} ready — open the settings with a ${startup.entry}, or __gcb.openSettings().`);
+      console.log(`[gcb] v${VERSION} ready — open the settings with a ${entryText()}, or __gcb.openSettings().`);
       if (startup.entryErrors.length) console.warn("[gcb] Spicetify entry points unavailable:", startup.entryErrors.join("; "));
     } catch (e) {
       startup.phase = "failed";

@@ -10,6 +10,7 @@ import { FILE, P, PRESETS_KEY, SOURCE, STORAGE_KEY } from "ext:config";
 import { applyCss, settingsReplaced } from "ext:hooks";
 import { claimBar, copyStatus } from "./claim.js";
 import { toHex } from "./colour.js";
+import { entryText, menuItemUsable, menuRegistered } from "./entry.js";
 import { closeModal, modal } from "./modal.js";
 import { presets, setPresets } from "./presets.js";
 import { createResults, printReport, reportLines, summarise } from "./report.js";
@@ -82,6 +83,20 @@ export function copiesDetail(copies) {
 
 // The duplicate guard (claim.js, #15), tried on its own registry and globals; the live ones are
 // never touched. Copies are described as claimBar() sees them: file, source URL, forwarder mark.
+// #6: the entry text says "hidden" exactly when Spicetify's MenuItem is broken, read when it's
+// read, not when the entry was registered.
+export function checkEntryText(check) {
+  const ISSUE = "gradient-bars#6";
+  const sample = "right-click on the bar + profile menu + top bar button";
+  const usable = entryText(sample, true);
+  const broken = entryText(sample, false);
+  check(ISSUE, 'Entry text says "hidden" exactly when MenuItem is broken (both cases)',
+    usable === sample && broken.includes("profile menu (hidden") && entryText(null, false) === null, `${usable} | ${broken}`);
+  const live = entryText() ?? "";
+  check(ISSUE, 'status().entry says "hidden" only while menuItemUsable() is false',
+    live.includes("hidden") === (menuRegistered && !menuItemUsable()), `${live || "none"} (usable: ${menuItemUsable()}, registered: ${menuRegistered})`);
+}
+
 export function checkDuplicateGuard(check) {
   const ISSUE = "gradient-bars#15"; // this repo's #15; a bare #15 is GPB's Spread modes
   const local = { copy: P, source: `https://xpui.app.spotify.com/extensions/${FILE}`, via: null };

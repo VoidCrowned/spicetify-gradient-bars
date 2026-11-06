@@ -13,7 +13,7 @@ Tracking: [#1](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/1).
 | Self-tests print a summary; `selfTest({ full: true })` copies the JSON | ✅ |
 | Manifest, README, this roadmap; open issues moved | ✅ |
 | Duplicate guard, load origin, old repos forward here ([#15](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/15)) | ✅ |
-| Releases GPB 1.8.0, GCB 1.0.0, GB 1.0.0, then the Marketplace ([#16](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/16)) | ready, waiting for me |
+| Releases GPB 1.8.0, GCB 1.0.1, GB 1.0.0, then the Marketplace ([#16](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/16)) | ready, waiting for me |
 
 ## Future
 
@@ -30,7 +30,7 @@ Agreed ideas, not scheduled. Tracking: [#10](https://github.com/VoidCrowned/spic
 | [#9](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/9) | Custom stop positions on the Connect bar | GCB |
 | [#11](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/11) | One settings window for Gradient Bars | GB |
 
-Open bugs without a milestone: [#6](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/6) (stale status text, with the next release), [#13](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/13) (self-tests restore every key), [#14](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/14) (skip Connect bar checks if the bar vanishes).
+Open bugs without a milestone: [#13](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/13) (self-tests restore every key), [#14](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/14) (skip Connect bar checks if the bar vanishes).
 
 ## Not planned
 

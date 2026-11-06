@@ -9,8 +9,8 @@
 // the bar are skipped while it isn't there.
 
 import { copyStatus } from "../shared/claim.js";
-import { menuItemUsable, menuRegistered, shared } from "../shared/entry.js";
-import { checkDuplicateGuard, closeOpenModal, copiesDetail, fileName, forwarders, lintCss, loadedCopies, otherFixes, runSelfTest, sameFileCopies, saveTestState, spicetifyVersion } from "../shared/selftest.js";
+import { entryText, menuItemUsable, menuRegistered, shared } from "../shared/entry.js";
+import { checkDuplicateGuard, checkEntryText, closeOpenModal, copiesDetail, fileName, forwarders, lintCss, loadedCopies, otherFixes, runSelfTest, sameFileCopies, saveTestState, spicetifyVersion } from "../shared/selftest.js";
 import { setSettings, update } from "../shared/settings.js";
 import { sleep, startup } from "../shared/startup.js";
 import { SELECTOR, barBase } from "./bar.js";
@@ -122,7 +122,7 @@ function environment() {
     spiceButton: getComputedStyle(document.documentElement).getPropertyValue("--spice-button").trim() || null,
     barBase: barBase(),
     textColour: textStatus(),
-    entry: startup.entry,
+    entry: entryText(),
     phase: startup.phase,
     entryErrors: startup.entryErrors,
     menu: { registered: menuRegistered, menuItemUsable: menuItemUsable() }, // info only, never a check
@@ -149,6 +149,7 @@ export function selfTest(options) {
           ? copiesDetail(env.copies)
           : `${copies.length} copies: ${copies.join(", ") || "none found"} (running: ${SOURCE ?? "unknown"}). Keep either the Marketplace install or the local CLI install (spicetify config extensions ${fileName()}-), not both.`);
       checkDuplicateGuard(check); // #15
+      checkEntryText(check); // #6
       await checkEntries(check, skip);
       await runChecks(check, skip, state.rootStyle, state.restoreButton);
     } catch (e) {

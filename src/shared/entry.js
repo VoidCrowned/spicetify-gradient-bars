@@ -260,6 +260,12 @@ export function menuItemUsable() {
   return menuItemVerdicts.get(component);
 }
 
+// The profile menu's part of startup.entry is built when it's read, from menuItemUsable() (#6):
+// the entry shows by itself once MenuItem is fixed, and the text has to follow it.
+const MENU_ENTRY = "profile menu";
+export const entryText = (text = startup.entry, usable = menuItemUsable()) =>
+  text && (usable ? text : text.replace(MENU_ENTRY, `${MENU_ENTRY} (hidden while Spicetify's MenuItem is broken)`));
+
 // Both Spicetify entries, independently and at the same time, not one as the other's fallback:
 // people look for settings in different places (GPB #45). The menu's ReactJSX wait never delays
 // the top bar. Resolves to a description of what's registered, or null.
@@ -287,8 +293,8 @@ async function registerMenuEntry() {
     item.register();
     window[`__${P}`].menuItem = item;
     menuRegistered = true;
-    // Items render when the menu opens, so this can't be checked here.
-    return menuItemUsable() ? "profile menu" : "profile menu (hidden while Spicetify's MenuItem is broken)";
+    // Items render when the menu opens, so this can't be checked here. entryText() adds "hidden".
+    return MENU_ENTRY;
   } catch (e) {
     startup.entryErrors.push(`Menu: ${e?.message || e}`);
     return null;

@@ -11,7 +11,7 @@
 //  5. Never reads or writes Gradient Progress Bar's storage key; both run side by side.
 
 import { COPY, claimBar } from "../shared/claim.js";
-import { joinGradientBars, registerSpicetifyEntries, setShared } from "../shared/entry.js";
+import { entryText, joinGradientBars, registerSpicetifyEntries, setShared } from "../shared/entry.js";
 import { loadPresets, setPresets } from "../shared/presets.js";
 import { flushSettings, loadSettings, setSettings } from "../shared/settings.js";
 import { startup, waitForSpicetify } from "../shared/startup.js";
@@ -52,7 +52,7 @@ export async function main() {
     const extra = await registerSpicetifyEntries();
     if (extra) startup.entry += ` + ${extra}`;
     startup.phase = "ready";
-    console.log(`[gcb] v${VERSION} ready — open the settings with a ${startup.entry}, or __gcb.openSettings().`);
+    console.log(`[gcb] v${VERSION} ready — open the settings with a ${entryText()}, or __gcb.openSettings().`);
     if (startup.entryErrors.length) console.warn("[gcb] Spicetify entry points unavailable:", startup.entryErrors.join("; "));
   } catch (e) {
     startup.phase = "failed";
