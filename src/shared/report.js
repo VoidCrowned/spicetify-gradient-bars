@@ -5,12 +5,16 @@
 
 import { writeClipboard } from "./clipboard.js";
 
+// A number is an issue of the bar's own (old) repo, as in the baselines; this repo's issues in
+// a bar's suite are written out ("gradient-bars#15"), since the old numbers overlap.
+const tagIssue = (issue) => (String(issue).includes("#") ? String(issue) : `#${issue}`);
+
 export function createResults() {
   const results = [];
   const check = (issue, name, pass, detail = "") =>
-    results.push({ id: results.length + 1, issue: `#${issue}`, check: name, pass: !!pass, detail: String(detail) });
+    results.push({ id: results.length + 1, issue: tagIssue(issue), check: name, pass: !!pass, detail: String(detail) });
   const skip = (issue, name, reason) =>
-    results.push({ id: results.length + 1, issue: `#${issue}`, check: name, pass: null, skipped: reason, detail: "" });
+    results.push({ id: results.length + 1, issue: tagIssue(issue), check: name, pass: null, skipped: reason, detail: "" });
   return { results, check, skip };
 }
 

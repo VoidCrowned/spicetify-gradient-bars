@@ -62,9 +62,10 @@ export async function checkSharedEntry(check) {
     check(58, "With Gradient Connect Bar: exactly one top-bar button, the owner's",
       Object.values(created).filter(Boolean).length === 1 && !!created[reg?.owner], `owner ${reg?.owner}; created ${JSON.stringify(created)}`);
   }
-  // Alone, the button opens the settings directly, as in v1.6.1.
+  // Alone, the button opens the settings directly, as in v1.6.1. Spicetify's Topbar.Button.element
+  // is a wrapper <div>; the click handler is on its .button inside it.
   if (role === "owner" && reg?.entries.length === 1 && shared.button?.element?.isConnected) {
-    shared.button.element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
+    (shared.button.button ?? shared.button.element).dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
     const opened = !!modal?.root.isConnected;
     const menuShown = !document.getElementById("gradient-bars-menu")?.hidden && !!document.getElementById("gradient-bars-menu");
     if (modal) {

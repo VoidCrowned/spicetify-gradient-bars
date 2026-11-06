@@ -83,6 +83,7 @@ export function copiesDetail(copies) {
 // The duplicate guard (claim.js, #15), tried on its own registry and globals; the live ones are
 // never touched. Copies are described as claimBar() sees them: file, source URL, forwarder mark.
 export function checkDuplicateGuard(check) {
+  const ISSUE = "gradient-bars#15"; // this repo's #15; a bare #15 is GPB's Spread modes
   const local = { copy: P, source: `https://xpui.app.spotify.com/extensions/${FILE}`, via: null };
   const cdn = { copy: P, source: `https://cdn.jsdelivr.net/gh/VoidCrowned/spicetify-gradient-bars@main/dist/${FILE}?time=1`, via: null };
   const forwarded = { ...cdn, via: "forwarder" };
@@ -112,14 +113,14 @@ export function checkDuplicateGuard(check) {
   ];
   for (const [order, first, second, activeFrom, skippedFrom] of twice) {
     const t = trial(first, second);
-    check(15, `Duplicate guard, ${order}: the second copy skips with one warning naming both origins`,
+    check(ISSUE, `Duplicate guard, ${order}: the second copy skips with one warning naming both origins`,
       t.ok && t.entry.active.from === activeFrom && t.entry.skipped[0].from === skippedFrom &&
         t.detail.includes(`(${activeFrom})`) && t.detail.includes(`(${skippedFrom})`),
       t.detail);
   }
   for (const [what, second] of [["the standalone file", local], ["Gradient Bars", gb]]) {
     const t = trial(older, second);
-    check(15, `Duplicate guard: with an older copy running (only window.__${P}), ${what} skips with one warning`,
+    check(ISSUE, `Duplicate guard: with an older copy running (only window.__${P}), ${what} skips with one warning`,
       t.ok && t.entry.active.older === true, t.detail);
   }
   const tag = (src, forwarder) => {
@@ -129,11 +130,11 @@ export function checkDuplicateGuard(check) {
     return el;
   };
   const tags = [tag(`https://cdn.jsdelivr.net/gh/VoidCrowned/old-repo@main/${FILE}?time=1`, true), tag(cdn.source, false)];
-  check(15, "A forwarder's own <script> isn't counted as a copy",
+  check(ISSUE, "A forwarder's own <script> isn't counted as a copy",
     loadedCopies(tags).length === 1 && loadedCopies(tags)[0] === cdn.source && forwarders(tags).length === 1,
     `copies: ${loadedCopies(tags).join(", ")}; forwarders: ${forwarders(tags).join(", ")}`);
   const from = copyStatus().from;
-  check(15, "This copy knows where it was loaded from (status().copy.from)",
+  check(ISSUE, "This copy knows where it was loaded from (status().copy.from)",
     ["local file", "jsDelivr", "old-repo forwarder"].includes(from), `${from}: ${SOURCE ?? "no source"}`);
 }
 

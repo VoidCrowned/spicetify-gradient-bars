@@ -2112,10 +2112,11 @@ ${OPTION_ROW_CSS.trim()}
   }
 
   // src/shared/report.js
+  var tagIssue = (issue) => String(issue).includes("#") ? String(issue) : `#${issue}`;
   function createResults() {
     const results = [];
-    const check = (issue, name, pass, detail = "") => results.push({ id: results.length + 1, issue: `#${issue}`, check: name, pass: !!pass, detail: String(detail) });
-    const skip = (issue, name, reason) => results.push({ id: results.length + 1, issue: `#${issue}`, check: name, pass: null, skipped: reason, detail: "" });
+    const check = (issue, name, pass, detail = "") => results.push({ id: results.length + 1, issue: tagIssue(issue), check: name, pass: !!pass, detail: String(detail) });
+    const skip = (issue, name, reason) => results.push({ id: results.length + 1, issue: tagIssue(issue), check: name, pass: null, skipped: reason, detail: "" });
     return { results, check, skip };
   }
   function summarise(results) {
@@ -2175,6 +2176,7 @@ ${OPTION_ROW_CSS.trim()}
     return [own[0], ...others.map((src) => `also ${src}, one of them skipped by the conflict rule`)].join("; ");
   }
   function checkDuplicateGuard(check) {
+    const ISSUE = "gradient-bars#15";
     const local = { copy: P, source: `https://xpui.app.spotify.com/extensions/${FILE}`, via: null };
     const cdn = { copy: P, source: `https://cdn.jsdelivr.net/gh/VoidCrowned/spicetify-gradient-bars@main/dist/${FILE}?time=1`, via: null };
     const forwarded = { ...cdn, via: "forwarder" };
@@ -2205,7 +2207,7 @@ ${OPTION_ROW_CSS.trim()}
     for (const [order, first, second, activeFrom, skippedFrom] of twice) {
       const t = trial(first, second);
       check(
-        15,
+        ISSUE,
         `Duplicate guard, ${order}: the second copy skips with one warning naming both origins`,
         t.ok && t.entry.active.from === activeFrom && t.entry.skipped[0].from === skippedFrom && t.detail.includes(`(${activeFrom})`) && t.detail.includes(`(${skippedFrom})`),
         t.detail
@@ -2214,7 +2216,7 @@ ${OPTION_ROW_CSS.trim()}
     for (const [what, second] of [["the standalone file", local], ["Gradient Bars", gb]]) {
       const t = trial(older, second);
       check(
-        15,
+        ISSUE,
         `Duplicate guard: with an older copy running (only window.__${P}), ${what} skips with one warning`,
         t.ok && t.entry.active.older === true,
         t.detail
@@ -2228,14 +2230,14 @@ ${OPTION_ROW_CSS.trim()}
     };
     const tags = [tag(`https://cdn.jsdelivr.net/gh/VoidCrowned/old-repo@main/${FILE}?time=1`, true), tag(cdn.source, false)];
     check(
-      15,
+      ISSUE,
       "A forwarder's own <script> isn't counted as a copy",
       loadedCopies(tags).length === 1 && loadedCopies(tags)[0] === cdn.source && forwarders(tags).length === 1,
       `copies: ${loadedCopies(tags).join(", ")}; forwarders: ${forwarders(tags).join(", ")}`
     );
     const from = copyStatus().from;
     check(
-      15,
+      ISSUE,
       "This copy knows where it was loaded from (status().copy.from)",
       ["local file", "jsDelivr", "old-repo forwarder"].includes(from),
       `${from}: ${SOURCE ?? "no source"}`
@@ -2421,7 +2423,7 @@ ${OPTION_ROW_CSS.trim()}
       );
     }
     if (role === "owner" && reg?.entries.length === 1 && shared.button?.element?.isConnected) {
-      shared.button.element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
+      (shared.button.button ?? shared.button.element).dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
       const opened2 = !!modal?.root.isConnected;
       const menuShown = !document.getElementById("gradient-bars-menu")?.hidden && !!document.getElementById("gradient-bars-menu");
       if (modal) {

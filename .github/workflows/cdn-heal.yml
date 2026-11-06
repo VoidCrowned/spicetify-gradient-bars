@@ -1,6 +1,6 @@
 name: CDN heal
 
-# Every 3 hours (off the hour): if jsDelivr @main still serves another VERSION than main for any
+# Every 3 hours (off the hour): if jsDelivr @main still serves another build than main for any
 # of the three extensions, purge again and wait for it (.github/scripts/purge-jsdelivr.sh
 # --if-stale, GPB #41). Kept apart from purge-jsdelivr.yml because GitHub disables a scheduled
 # workflow after 60 days without repository activity (GPB #42); purge-jsdelivr.yml re-enables
