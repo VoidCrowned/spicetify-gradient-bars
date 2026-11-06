@@ -5,7 +5,7 @@
 // DESCRIPTION: Gradient Progress Bar and Gradient Connect Bar in one extension.
 // LICENSE: WTFPL v2, see LICENSE
 //
-// Contains Gradient Progress Bar 1.7.0 and Gradient Connect Bar 1.0.0, each as built
+// Contains Gradient Progress Bar 1.8.0 and Gradient Connect Bar 1.0.0, each as built
 // for its own file, then window.__gb. Built from src/ with esbuild: edit that, then run npm run build.
 
 // ── Gradient Progress Bar ───────────────────────────────────────────────────────────────────────────
@@ -13,7 +13,7 @@
   // src/gpb/config.js
   var P = "gpb";
   var NAME = "Gradient Progress Bar";
-  var VERSION = "1.7.0";
+  var VERSION = "1.8.0";
   var FILE = "gradientProgressBar.js";
   var SOURCE = document.currentScript?.src || null;
   var STORAGE_KEY = "gpb:settings";

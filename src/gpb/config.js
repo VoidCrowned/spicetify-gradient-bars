@@ -3,7 +3,7 @@
 
 export const P = "gpb"; // prefix of every id and class, the console tag [gpb] and window.__gpb
 export const NAME = "Gradient Progress Bar"; // as in manifest.json; also the settings window's title
-export const VERSION = "1.7.0";
+export const VERSION = "1.8.0";
 export const FILE = "gradientProgressBar.js"; // the standalone file, for the copies check (GPB #39)
 
 // Where this copy was loaded from: the Marketplace (jsDelivr) or the CLI (extensions/).
