@@ -12,7 +12,8 @@ Tracking: [#1](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/1).
 | Gradient Bars (`dist/gradientBars.js`, `__gb`), conflict rule for double installs | ✅ |
 | Self-tests print a summary; `selfTest({ full: true })` copies the JSON | ✅ |
 | Manifest, README, this roadmap; open issues moved | ✅ |
-| Test build, then releases and the Marketplace | waiting for my test |
+| Duplicate guard, load origin, old repos forward here ([#15](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/15)) | ✅ |
+| Releases GPB 1.8.0, GCB 1.0.0, GB 1.0.0, then the Marketplace ([#16](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/16)) | ready, waiting for me |
 
 ## Future
 

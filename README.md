@@ -43,7 +43,7 @@ In the settings: click a colour dot to edit it, right-click it to duplicate or r
 
 ## Compatibility
 
-Tested with [Hazy](https://github.com/Astromations/Hazy) (the theme colour follows its accent) and [playback-bar-waveform](https://github.com/Konsl/spicetify-extensions) (the gradient is drawn inside the waveform), on Spotify 1.3.6 with Spicetify 2.46.
+Tested with [Hazy](https://github.com/Astromations/Hazy) (the theme colour follows its accent) and [playback-bar-waveform](https://github.com/Konsl/spicetify-extensions) (the gradient is drawn inside the waveform), on Spotify 1.3.8 with Spicetify 2.46.
 
 ## Troubleshooting
 
