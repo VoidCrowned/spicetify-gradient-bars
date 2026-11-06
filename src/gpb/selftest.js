@@ -5,7 +5,7 @@
 import { copyStatus } from "../shared/claim.js";
 import { SELF, menuItemUsable, menuRegistered, shared } from "../shared/entry.js";
 import { presets } from "../shared/presets.js";
-import { closeOpenModal, copiesDetail, fileName, lintCss, loadedCopies, otherFixes, runSelfTest, sameFileCopies, saveTestState, spicetifyVersion } from "../shared/selftest.js";
+import { checkDuplicateGuard, closeOpenModal, copiesDetail, fileName, forwarders, lintCss, loadedCopies, otherFixes, runSelfTest, sameFileCopies, saveTestState, spicetifyVersion } from "../shared/selftest.js";
 import { setSettings, update } from "../shared/settings.js";
 import { api, sleep, startup } from "../shared/startup.js";
 import { checkEntryIcon, checkSharedEntry, runChecks } from "./checks.js";
@@ -96,6 +96,7 @@ function environment() {
     extension: VERSION,
     source: SOURCE,
     copies: loadedCopies(),
+    forwarders: forwarders(), // #15: the old repos' files, which only load a copy from this repo
     copy: copyStatus(),
     spotify: Spicetify.Platform?.version ?? null,
     spicetify: spicetifyVersion(), // GPB #55: which Spicetify release fixed the top bar and MenuItem
@@ -151,6 +152,7 @@ export function selfTest(options) {
         copies.length === 1
           ? copiesDetail(env.copies)
           : `${copies.length} copies: ${copies.join(", ") || "none found"} (running: ${SOURCE ?? "unknown"}). Keep either the Marketplace install or the local CLI install (spicetify config extensions ${fileName()}-), not both.`);
+      checkDuplicateGuard(check); // #15
       await checkEntryIcon(check);
       await checkSharedEntry(check);
       await runChecks(check, state.rootStyle, state.restoreButton);

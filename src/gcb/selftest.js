@@ -10,7 +10,7 @@
 
 import { copyStatus } from "../shared/claim.js";
 import { menuItemUsable, menuRegistered, shared } from "../shared/entry.js";
-import { closeOpenModal, copiesDetail, fileName, lintCss, loadedCopies, otherFixes, runSelfTest, sameFileCopies, saveTestState, spicetifyVersion } from "../shared/selftest.js";
+import { checkDuplicateGuard, closeOpenModal, copiesDetail, fileName, forwarders, lintCss, loadedCopies, otherFixes, runSelfTest, sameFileCopies, saveTestState, spicetifyVersion } from "../shared/selftest.js";
 import { setSettings, update } from "../shared/settings.js";
 import { sleep, startup } from "../shared/startup.js";
 import { SELECTOR, barBase } from "./bar.js";
@@ -110,6 +110,7 @@ function environment() {
     extension: VERSION,
     source: SOURCE,
     copies: loadedCopies(),
+    forwarders: forwarders(), // #15: the old repos' files, which only load a copy from this repo
     copy: copyStatus(),
     spotify: Spicetify.Platform?.version ?? null,
     spicetify: spicetifyVersion(),
@@ -147,6 +148,7 @@ export function selfTest(options) {
         copies.length === 1
           ? copiesDetail(env.copies)
           : `${copies.length} copies: ${copies.join(", ") || "none found"} (running: ${SOURCE ?? "unknown"}). Keep either the Marketplace install or the local CLI install (spicetify config extensions ${fileName()}-), not both.`);
+      checkDuplicateGuard(check); // #15
       await checkEntries(check, skip);
       await runChecks(check, skip, state.rootStyle, state.restoreButton);
     } catch (e) {

@@ -14,7 +14,8 @@ import { gbChecks } from "./checks.js";
 
 export const BARS = ["gpb", "gcb"];
 
-// Which copy runs each bar: "gb" (this file), "gpb" / "gcb" (the standalone file), or null.
+// Which copy runs each bar: "gb" (this file), "gpb" / "gcb" (the standalone file), or null, and
+// where it was loaded from.
 export function status() {
   const bars = Object.fromEntries(BARS.map((id) => {
     const entry = window.__gradientBarsCopies?.[id];
@@ -23,7 +24,9 @@ export function status() {
       name: COPY_NAMES[id],
       copy: entry?.active?.copy ?? (api ? id : null),
       version: entry?.active?.version ?? api?.version ?? null,
-      skipped: entry?.skipped.map((c) => `${c.copy}${c.version ? ` ${c.version}` : ""}`) ?? [],
+      from: entry?.active?.from ?? null, // #15: local file, jsDelivr or old-repo forwarder (null: an older copy)
+      source: entry?.active?.source ?? null,
+      skipped: entry?.skipped.map((c) => `${c.copy}${c.version ? ` ${c.version}` : ""}${c.from ? ` (${c.from})` : ""}`) ?? [],
     }];
   }));
   return { version: VERSION, source: SOURCE, bars };

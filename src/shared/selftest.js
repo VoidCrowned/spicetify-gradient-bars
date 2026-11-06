@@ -8,6 +8,7 @@
 
 import { FILE, P, PRESETS_KEY, SOURCE, STORAGE_KEY } from "ext:config";
 import { applyCss, settingsReplaced } from "ext:hooks";
+import { claimBar, copyStatus } from "./claim.js";
 import { toHex } from "./colour.js";
 import { closeModal, modal } from "./modal.js";
 import { presets, setPresets } from "./presets.js";
@@ -52,9 +53,17 @@ export async function withoutTransitions(elements, fn) {
 const BAR_FILES = [FILE, "gradientBars.js"];
 const fileOf = (src) => src?.split(/[?#]/)[0].split("/").pop() ?? null;
 
-// Every <script> that loads this bar, from either file (GPB #39).
-export const loadedCopies = () =>
-  [...document.querySelectorAll("script[src]")].map((el) => el.src).filter((src) => BAR_FILES.includes(fileOf(src)));
+// The old repos' forwarders mark their own <script> with this attribute (#15). They only load a
+// copy from this repo, so they aren't copies themselves.
+const FORWARDER_ATTR = "data-gradient-bars-forwarder";
+const scriptTags = () => document.querySelectorAll("script[src]");
+
+// Every <script> that loads this bar, from either file (GPB #39), forwarders left out.
+export const loadedCopies = (scripts = scriptTags()) =>
+  [...scripts].filter((el) => !el.hasAttribute(FORWARDER_ATTR)).map((el) => el.src).filter((src) => BAR_FILES.includes(fileOf(src)));
+
+// The old repos' forwarders on the page (#15), for the environment block.
+export const forwarders = (scripts = scriptTags()) => [...scripts].filter((el) => el.hasAttribute(FORWARDER_ATTR)).map((el) => el.src);
 
 // The copies of the file this copy came from. More than one means a Marketplace install and a
 // local CLI install are both active, and the second copy fights the first (GPB #39). A copy in
@@ -69,6 +78,63 @@ export function copiesDetail(copies) {
   const own = sameFileCopies(copies);
   const others = copies.filter((src) => !own.includes(src));
   return [own[0], ...others.map((src) => `also ${src}, one of them skipped by the conflict rule`)].join("; ");
+}
+
+// The duplicate guard (claim.js, #15), tried on its own registry and globals; the live ones are
+// never touched. Copies are described as claimBar() sees them: file, source URL, forwarder mark.
+export function checkDuplicateGuard(check) {
+  const local = { copy: P, source: `https://xpui.app.spotify.com/extensions/${FILE}`, via: null };
+  const cdn = { copy: P, source: `https://cdn.jsdelivr.net/gh/VoidCrowned/spicetify-gradient-bars@main/dist/${FILE}?time=1`, via: null };
+  const forwarded = { ...cdn, via: "forwarder" };
+  const gb = { copy: "gb", source: "https://xpui.app.spotify.com/extensions/gradientBars.js", via: null };
+  const older = { older: true };
+  const trial = (first, second) => {
+    const registry = {};
+    const globals = {};
+    const warnings = [];
+    const warn = (message) => warnings.push(message);
+    let firstRuns = true;
+    if (first.older) globals[`__${P}`] = { version: "older" }; // a copy from before the guard: only its global
+    else {
+      firstRuns = claimBar({ id: P, ...first, version: "1", registry, globals, warn });
+      globals[`__${P}`] = { version: "1", copy: first.copy };
+    }
+    const secondRuns = claimBar({ id: P, ...second, version: "2", registry, globals, warn });
+    const entry = registry[P];
+    const ok = firstRuns && !secondRuns && warnings.length === 1 && entry.skipped.length === 1 && entry.skipped[0].warnings === 1;
+    return { ok, entry, detail: warnings.join(" | ") || "no warning" };
+  };
+  const twice = [
+    ["a local file, then jsDelivr", local, cdn, "local file", "jsDelivr"],
+    ["jsDelivr, then a local file", cdn, local, "jsDelivr", "local file"],
+    ["the old-repo forwarder, then Gradient Bars", forwarded, gb, "old-repo forwarder", "local file"],
+    ["Gradient Bars, then the old-repo forwarder", gb, forwarded, "local file", "old-repo forwarder"],
+  ];
+  for (const [order, first, second, activeFrom, skippedFrom] of twice) {
+    const t = trial(first, second);
+    check(15, `Duplicate guard, ${order}: the second copy skips with one warning naming both origins`,
+      t.ok && t.entry.active.from === activeFrom && t.entry.skipped[0].from === skippedFrom &&
+        t.detail.includes(`(${activeFrom})`) && t.detail.includes(`(${skippedFrom})`),
+      t.detail);
+  }
+  for (const [what, second] of [["the standalone file", local], ["Gradient Bars", gb]]) {
+    const t = trial(older, second);
+    check(15, `Duplicate guard: with an older copy running (only window.__${P}), ${what} skips with one warning`,
+      t.ok && t.entry.active.older === true, t.detail);
+  }
+  const tag = (src, forwarder) => {
+    const el = document.createElement("script"); // never inserted, so never loaded
+    el.src = src;
+    if (forwarder) el.setAttribute(FORWARDER_ATTR, "");
+    return el;
+  };
+  const tags = [tag(`https://cdn.jsdelivr.net/gh/VoidCrowned/old-repo@main/${FILE}?time=1`, true), tag(cdn.source, false)];
+  check(15, "A forwarder's own <script> isn't counted as a copy",
+    loadedCopies(tags).length === 1 && loadedCopies(tags)[0] === cdn.source && forwarders(tags).length === 1,
+    `copies: ${loadedCopies(tags).join(", ")}; forwarders: ${forwarders(tags).join(", ")}`);
+  const from = copyStatus().from;
+  check(15, "This copy knows where it was loaded from (status().copy.from)",
+    ["local file", "jsDelivr", "old-repo forwarder"].includes(from), `${from}: ${SOURCE ?? "no source"}`);
 }
 
 // A function declaration, so status() can use it from the first line on (GPB #55).

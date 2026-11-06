@@ -212,7 +212,7 @@ function mergeMaps(parts) {
 const GLOBALS = new Set(("window document console navigator location Spicetify innerWidth innerHeight setTimeout clearTimeout " +
   "requestAnimationFrame cancelAnimationFrame getComputedStyle structuredClone queueMicrotask btoa atob crypto CSS " +
   "MutationObserver TextEncoder XMLHttpRequest Promise Date Math JSON Object Array String Number Boolean Map Set WeakMap " +
-  "Error RegExp Symbol Function Uint8Array Infinity NaN undefined parseInt parseFloat isNaN performance Event MouseEvent " +
+  "Error RegExp Symbol Function Uint8Array Infinity NaN undefined parseInt parseFloat isNaN performance URL Event MouseEvent " +
   "KeyboardEvent PointerEvent DragEvent DataTransfer Node CSSStyleSheet").split(" "));
 
 function buildProblems(files) {

@@ -37,16 +37,25 @@
   var COPY_NAMES = { gpb: "Gradient Progress Bar", gcb: "Gradient Connect Bar", gb: "Gradient Bars" };
   var COPY_FILES = { gpb: "gradientProgressBar.js", gcb: "gradientConnectBar.js", gb: "gradientBars.js" };
   var fileOf = (copy) => COPY_FILES[copy.copy] ?? copy.copy;
-  function claimBar({ id = P, copy = COPY, version = VERSION, source = SOURCE, registry = null, globals = window, warn = console.warn } = {}) {
+  var VIA = document.currentScript?.dataset?.gradientBarsVia ?? null;
+  function originOf(source, via = null) {
+    if (via === "forwarder") return "old-repo forwarder";
+    if (!source) return "unknown";
+    if (source.startsWith("https://cdn.jsdelivr.net/")) return "jsDelivr";
+    if (new URL(source, location.href).pathname.startsWith("/extensions/")) return "local file";
+    return "other";
+  }
+  var describe = (copy) => `${fileOf(copy)}${copy.from && copy.from !== "unknown" ? ` (${copy.from})` : ""}`;
+  function claimBar({ id = P, copy = COPY, version = VERSION, source = SOURCE, via = VIA, registry = null, globals = window, warn = console.warn } = {}) {
     const copies = registry ?? (globals.__gradientBarsCopies ??= {});
     const entry = copies[id] ??= { active: null, skipped: [] };
-    const me = { copy, version, source, warnings: 0 };
+    const me = { copy, version, source, via, from: originOf(source, via), warnings: 0 };
     const running = globals[`__${id}`];
-    if (!entry.active && running) entry.active = { copy: running.copy ?? id, version: running.version ?? null, source: null, older: !running.copy };
+    if (!entry.active && running) entry.active = { copy: running.copy ?? id, version: running.version ?? null, source: null, via: null, from: null, older: !running.copy };
     if (entry.active) {
       entry.skipped.push(me);
       me.warnings++;
-      warn(`[${id}] ${COPY_NAMES[id]} already runs from ${fileOf(entry.active)}, so this copy (${fileOf(me)}) skips it. Keep only one of them installed.`);
+      warn(`[${id}] ${COPY_NAMES[id]} already runs from ${describe(entry.active)}, so this copy (${describe(me)}) skips it. Keep only one of them installed.`);
       return false;
     }
     entry.active = me;
@@ -56,8 +65,11 @@
     const entry = window.__gradientBarsCopies?.[id];
     return {
       this: COPY,
+      from: originOf(SOURCE, VIA),
       active: entry?.active?.copy ?? null,
-      skipped: entry?.skipped.map((c) => `${c.copy}${c.version ? ` ${c.version}` : ""}`) ?? []
+      activeFrom: entry?.active?.from ?? null,
+      activeSource: entry?.active?.source ?? null,
+      skipped: entry?.skipped.map((c) => `${c.copy}${c.version ? ` ${c.version}` : ""}${c.from ? ` (${c.from})` : ""}`) ?? []
     };
   }
 
@@ -2151,13 +2163,83 @@ ${OPTION_ROW_CSS.trim()}
   }
   var BAR_FILES = [FILE, "gradientBars.js"];
   var fileOf2 = (src) => src?.split(/[?#]/)[0].split("/").pop() ?? null;
-  var loadedCopies = () => [...document.querySelectorAll("script[src]")].map((el) => el.src).filter((src) => BAR_FILES.includes(fileOf2(src)));
+  var FORWARDER_ATTR = "data-gradient-bars-forwarder";
+  var scriptTags = () => document.querySelectorAll("script[src]");
+  var loadedCopies = (scripts = scriptTags()) => [...scripts].filter((el) => !el.hasAttribute(FORWARDER_ATTR)).map((el) => el.src).filter((src) => BAR_FILES.includes(fileOf2(src)));
+  var forwarders = (scripts = scriptTags()) => [...scripts].filter((el) => el.hasAttribute(FORWARDER_ATTR)).map((el) => el.src);
   var sameFileCopies = (copies = loadedCopies()) => copies.filter((src) => fileOf2(src) === fileOf2(SOURCE ?? FILE));
   var fileName = () => fileOf2(SOURCE ?? FILE);
   function copiesDetail(copies) {
     const own = sameFileCopies(copies);
     const others = copies.filter((src) => !own.includes(src));
     return [own[0], ...others.map((src) => `also ${src}, one of them skipped by the conflict rule`)].join("; ");
+  }
+  function checkDuplicateGuard(check) {
+    const local = { copy: P, source: `https://xpui.app.spotify.com/extensions/${FILE}`, via: null };
+    const cdn = { copy: P, source: `https://cdn.jsdelivr.net/gh/VoidCrowned/spicetify-gradient-bars@main/dist/${FILE}?time=1`, via: null };
+    const forwarded = { ...cdn, via: "forwarder" };
+    const gb = { copy: "gb", source: "https://xpui.app.spotify.com/extensions/gradientBars.js", via: null };
+    const older = { older: true };
+    const trial = (first, second) => {
+      const registry = {};
+      const globals = {};
+      const warnings = [];
+      const warn = (message) => warnings.push(message);
+      let firstRuns = true;
+      if (first.older) globals[`__${P}`] = { version: "older" };
+      else {
+        firstRuns = claimBar({ id: P, ...first, version: "1", registry, globals, warn });
+        globals[`__${P}`] = { version: "1", copy: first.copy };
+      }
+      const secondRuns = claimBar({ id: P, ...second, version: "2", registry, globals, warn });
+      const entry = registry[P];
+      const ok = firstRuns && !secondRuns && warnings.length === 1 && entry.skipped.length === 1 && entry.skipped[0].warnings === 1;
+      return { ok, entry, detail: warnings.join(" | ") || "no warning" };
+    };
+    const twice = [
+      ["a local file, then jsDelivr", local, cdn, "local file", "jsDelivr"],
+      ["jsDelivr, then a local file", cdn, local, "jsDelivr", "local file"],
+      ["the old-repo forwarder, then Gradient Bars", forwarded, gb, "old-repo forwarder", "local file"],
+      ["Gradient Bars, then the old-repo forwarder", gb, forwarded, "local file", "old-repo forwarder"]
+    ];
+    for (const [order, first, second, activeFrom, skippedFrom] of twice) {
+      const t = trial(first, second);
+      check(
+        15,
+        `Duplicate guard, ${order}: the second copy skips with one warning naming both origins`,
+        t.ok && t.entry.active.from === activeFrom && t.entry.skipped[0].from === skippedFrom && t.detail.includes(`(${activeFrom})`) && t.detail.includes(`(${skippedFrom})`),
+        t.detail
+      );
+    }
+    for (const [what, second] of [["the standalone file", local], ["Gradient Bars", gb]]) {
+      const t = trial(older, second);
+      check(
+        15,
+        `Duplicate guard: with an older copy running (only window.__${P}), ${what} skips with one warning`,
+        t.ok && t.entry.active.older === true,
+        t.detail
+      );
+    }
+    const tag = (src, forwarder) => {
+      const el = document.createElement("script");
+      el.src = src;
+      if (forwarder) el.setAttribute(FORWARDER_ATTR, "");
+      return el;
+    };
+    const tags = [tag(`https://cdn.jsdelivr.net/gh/VoidCrowned/old-repo@main/${FILE}?time=1`, true), tag(cdn.source, false)];
+    check(
+      15,
+      "A forwarder's own <script> isn't counted as a copy",
+      loadedCopies(tags).length === 1 && loadedCopies(tags)[0] === cdn.source && forwarders(tags).length === 1,
+      `copies: ${loadedCopies(tags).join(", ")}; forwarders: ${forwarders(tags).join(", ")}`
+    );
+    const from = copyStatus().from;
+    check(
+      15,
+      "This copy knows where it was loaded from (status().copy.from)",
+      ["local file", "jsDelivr", "old-repo forwarder"].includes(from),
+      `${from}: ${SOURCE ?? "no source"}`
+    );
   }
   function spicetifyVersion() {
     return window.Spicetify?.Config?.version ?? "unknown";
@@ -4627,6 +4709,8 @@ ${threeColours}	 `), "");
       extension: VERSION,
       source: SOURCE,
       copies: loadedCopies(),
+      forwarders: forwarders(),
+      // #15: the old repos' files, which only load a copy from this repo
       copy: copyStatus(),
       spotify: Spicetify.Platform?.version ?? null,
       spicetify: spicetifyVersion(),
@@ -4691,6 +4775,7 @@ ${threeColours}	 `), "");
           copies.length === 1,
           copies.length === 1 ? copiesDetail(env.copies) : `${copies.length} copies: ${copies.join(", ") || "none found"} (running: ${SOURCE ?? "unknown"}). Keep either the Marketplace install or the local CLI install (spicetify config extensions ${fileName()}-), not both.`
         );
+        checkDuplicateGuard(check);
         await checkEntryIcon(check);
         await checkSharedEntry(check);
         await runChecks(check, state.rootStyle, state.restoreButton);
