@@ -31,6 +31,9 @@ concurrency:
 
 jobs:
   purge:
+    # Only main is what's released and served (@main). A manual run on another branch, such as
+    # dev, would compare that branch's builds with @main and purge for nothing.
+    if: github.ref == 'refs/heads/main' || github.event_name == 'release'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

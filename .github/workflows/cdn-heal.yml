@@ -19,6 +19,8 @@ concurrency:
 
 jobs:
   heal:
+    # Only main is served (@main); a manual run on another branch would compare the wrong builds.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
