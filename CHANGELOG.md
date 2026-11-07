@@ -2,6 +2,11 @@
 
 Releases are tagged per extension (`gpb-v…`, `gcb-v…`, `gb-v…`). Older releases are in the old repos' changelogs: [Gradient Progress Bar](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/blob/main/CHANGELOG.md) (up to v1.7.0) and [Gradient Connect Bar](https://github.com/VoidCrowned/spicetify-gradient-connect-bar/blob/main/CHANGELOG.md) (v1.0.0).
 
+## Unreleased
+
+- Self-tests never write your real settings or presets: a run uses its own keys, and leftovers from an interrupted run are removed on start-up ([#13](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/13)).
+- Gradient Connect Bar's self-test skips the checks that need the Connect bar if it disappears mid-run, instead of failing them ([#14](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/14)).
+
 ## Gradient Progress Bar 1.8.0, Gradient Connect Bar 1.0.1, Gradient Bars 1.0.0 (7 Nov 2026)
 
 - Both extensions now live in this repo and share their code ([#1](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/1)). Same settings, same behaviour.

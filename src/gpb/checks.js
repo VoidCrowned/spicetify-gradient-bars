@@ -11,11 +11,12 @@ import { APPLY_LABEL, COPIED_LABEL, COPIED_MS, COPY_HINT, EXPORT_LABEL, EXPORT_T
 import { BUILT_IN_PRESETS, addPreset, deletePreset, loadPresets, presetSettings, presets, renamePreset, sameSettings, savePresets, setPresets, uniqueName, updatePreset } from "../shared/presets.js";
 import { RESET_CONFIRM_LABEL, RESET_CONFIRM_MS } from "../shared/reset.js";
 import { BLUE, GREEN, PROBE, RED, computedHex, custom, styleText, theme, tick, waitFor, withoutTransitions } from "../shared/selftest.js";
+import { presetsKey, settingsKey } from "../shared/keys.js";
 import { loadSettings, setSettings, settings, update } from "../shared/settings.js";
 import { api, sleep } from "../shared/startup.js";
 import { STOP_GAP, closePopover, dotEl, popover, selectStop } from "../shared/stop-editor.js";
 import { findStop, selectedId, setStopColour } from "../shared/stops.js";
-import { ENTRY_LABEL, HELP_LINES, IMPORT_TITLE, PRESETS_KEY, SCHEMA_VERSION, STORAGE_KEY } from "./config.js";
+import { ENTRY_LABEL, HELP_LINES, IMPORT_TITLE, SCHEMA_VERSION } from "./config.js";
 import { statusReport } from "./diagnostics.js";
 import { FILL, HANDLE, SCOPE, buildCss, fillImage } from "./render.js";
 import { barGeometry, barVars, cssProblems, fillTransforms, hasMaskAnimation, setTestSettings, songFill, songHandle, songchangeListeners, waveformActive } from "./selftest.js";
@@ -1240,7 +1241,7 @@ export async function runChecks(check, rootStyle, restoreButton) {
     spreadState());
   stillOpen("choosing Slide");
   await sleep(SAVE_DELAY + 100);
-  const savedMode = JSON.parse(Spicetify.LocalStorage.get(STORAGE_KEY) ?? "{}").mode;
+  const savedMode = JSON.parse(Spicetify.LocalStorage.get(settingsKey()) ?? "{}").mode;
   check(15, "The chosen mode is saved", savedMode === "slide", `stored mode ${savedMode}`);
 
   realClick(modeBtn("compress"));
@@ -1306,8 +1307,8 @@ export async function runChecks(check, rootStyle, restoreButton) {
   const [reloadedPresets, reloadWarnings] = gpbWarnings(() => loadPresets());
   check(21, "Presets store: save → load round-trip in gpb:presets (theme and custom stops, gradient, mode); gpb:settings untouched",
     JSON.stringify(reloadedPresets) === JSON.stringify(presets) && !reloadWarnings &&
-      JSON.parse(Spicetify.LocalStorage.get(PRESETS_KEY)).version === PRESETS_VERSION,
-    `${names(reloadedPresets)}; ${reloadWarnings} warning(s); ${Spicetify.LocalStorage.get(PRESETS_KEY).length} characters`);
+      JSON.parse(Spicetify.LocalStorage.get(presetsKey())).version === PRESETS_VERSION,
+    `${names(reloadedPresets)}; ${reloadWarnings} warning(s); ${Spicetify.LocalStorage.get(presetsKey()).length} characters`);
   const [kept, dropWarnings] = gpbWarnings(() => loadPresets(presetsJson([
     own("p1", "  Good  ", sampleA),
     own("p2", "Bad hex", { ...sampleA, stops: [custom("s1", "#12345")] }),
@@ -1636,7 +1637,7 @@ export async function runChecks(check, rootStyle, restoreButton) {
   await tick();
   const mineId = presets[0]?.id;
   const mineChip = mineId && chipOf(mineId);
-  const storedPresets = JSON.parse(Spicetify.LocalStorage.get(PRESETS_KEY) ?? "{}").presets ?? [];
+  const storedPresets = JSON.parse(Spicetify.LocalStorage.get(presetsKey()) ?? "{}").presets ?? [];
   check(21, "Enter saves the current settings as 'Mine' (stored), its chip appears after the built-ins, active and focused",
     presets.length === 1 && presets[0].name === "Mine" && sameSettings(presetSettings(presets[0]), settings) &&
       storedPresets[0]?.name === "Mine" && chipIds() === `b:void,b:sunset,b:aurora,b:neon,b:fairy,${mineId},save` &&
@@ -1702,7 +1703,7 @@ export async function runChecks(check, rootStyle, restoreButton) {
   await tick();
   await tick();
   check(21, "Delete removes the preset at once (storage too); 'Deleted \"Fairy (2)\" · Undo'; the menu item stays connected",
-    presets.length === 1 && !chipOf(mineId) && !Spicetify.LocalStorage.get(PRESETS_KEY).includes('"Fairy (2)"') &&
+    presets.length === 1 && !chipOf(mineId) && !Spicetify.LocalStorage.get(presetsKey()).includes('"Fairy (2)"') &&
       undoShows('Deleted "Fairy (2)"') && deleteNode.isConnected,
     `${names(presets)}; ${undoState()}`);
   stillOpen("deleting a preset");
@@ -1710,7 +1711,7 @@ export async function runChecks(check, rootStyle, restoreButton) {
   await tick();
   await tick();
   check(21, "Undo after Delete restores the preset in its old place, in storage too",
-    JSON.stringify(presets) === beforeDelete && Spicetify.LocalStorage.get(PRESETS_KEY) === presetsJson(JSON.parse(beforeDelete)) &&
+    JSON.stringify(presets) === beforeDelete && Spicetify.LocalStorage.get(presetsKey()) === presetsJson(JSON.parse(beforeDelete)) &&
       chipIds().startsWith(`b:void,b:sunset,b:aurora,b:neon,b:fairy,${mineId},`),
     `${names(presets)}; ${chipIds()}`);
   stillOpen("Undo after deleting");
@@ -1929,7 +1930,7 @@ export async function runChecks(check, rootStyle, restoreButton) {
     `${JSON.stringify(legacy.loaded)}, ${legacy.ours} warning(s)`);
 
   setTestSettings(true, [theme("s1"), custom("s2", RED), custom("s4", BLUE)], "anchored");
-  const writtenAtOnce = Spicetify.LocalStorage.get(STORAGE_KEY) === JSON.stringify(settings);
+  const writtenAtOnce = Spicetify.LocalStorage.get(settingsKey()) === JSON.stringify(settings);
   await new Promise((r) => setTimeout(r, SAVE_DELAY + 100));
   const reloaded = loadSettings();
   check(2, "Saves are debounced, then a load returns identical settings (mode included)",

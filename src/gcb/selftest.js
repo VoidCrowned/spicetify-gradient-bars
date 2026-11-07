@@ -14,7 +14,7 @@ import { checkDuplicateGuard, checkEntryText, closeOpenModal, copiesDetail, file
 import { setSettings, update } from "../shared/settings.js";
 import { sleep, startup } from "../shared/startup.js";
 import { SELECTOR, barBase } from "./bar.js";
-import { checkEntries, runChecks } from "./checks.js";
+import { checkBarGone, checkEntries, runChecks } from "./checks.js";
 import { SCHEMA_VERSION, SOURCE, VERSION } from "./config.js";
 import { domProbe, textStatus } from "./diagnostics.js";
 import { DEFAULT_TEXT } from "./settings.js";
@@ -150,12 +150,14 @@ export function selfTest(options) {
           : `${copies.length} copies: ${copies.join(", ") || "none found"} (running: ${SOURCE ?? "unknown"}). Keep either the Marketplace install or the local CLI install (spicetify config extensions ${fileName()}-), not both.`);
       checkDuplicateGuard(check); // #15
       checkEntryText(check); // #6
+      checkBarGone(check); // #14
       await checkEntries(check, skip);
       await runChecks(check, skip, state.rootStyle, state.restoreButton);
     } catch (e) {
       check(9, "Self-test ran to completion", false, e?.stack || e);
     } finally {
       state.restore();
+      state.checkRealKeys(check); // #13
     }
     return env;
   });

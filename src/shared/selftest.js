@@ -11,10 +11,11 @@ import { applyCss, settingsReplaced } from "ext:hooks";
 import { claimBar, copyStatus } from "./claim.js";
 import { toHex } from "./colour.js";
 import { entryText, menuItemUsable, menuRegistered } from "./entry.js";
+import { TEST_KEYS, useTestKeys } from "./keys.js";
 import { closeModal, modal } from "./modal.js";
 import { presets, setPresets } from "./presets.js";
 import { createResults, printReport, reportLines, summarise } from "./report.js";
-import { cancelSave, setSettings, settings } from "./settings.js";
+import { cancelSave, flushSettings, setSettings, settings } from "./settings.js";
 import { sleep } from "./startup.js";
 
 export const RED = "#ff0000";
@@ -172,13 +173,17 @@ export function closeOpenModal() {
   }
 }
 
-// Saves what a suite changes: the settings and presets, in memory and stored, and :root's inline
-// --spice-button. restore() closes the modal and puts all of it back.
+// Saves what a suite changes: the settings and presets in memory, and :root's inline
+// --spice-button. Storage goes to the self-test keys meanwhile (#13), so the real keys are never
+// written. restore() closes the modal, puts everything back and returns to the real keys;
+// checkRealKeys() then checks that they're byte-identical to before the run.
 export function saveTestState() {
+  flushSettings(); // a pending save of the user's own still goes to the real key
+  const realKeys = () => [STORAGE_KEY, PRESETS_KEY].map((key) => Spicetify.LocalStorage.get(key));
+  const realBefore = realKeys();
+  useTestKeys(true);
   const savedSettings = structuredClone(settings);
-  const savedRaw = Spicetify.LocalStorage.get(STORAGE_KEY);
   const savedPresets = structuredClone(presets); // GPB #21, GCB #29
-  const savedPresetsRaw = Spicetify.LocalStorage.get(PRESETS_KEY);
   const style = document.documentElement.style;
   const savedButton = [style.getPropertyValue("--spice-button"), style.getPropertyPriority("--spice-button")];
   // Checks set a probe --spice-button through rootStyle. Themes may write their own on :root at
@@ -210,13 +215,20 @@ export function saveTestState() {
     setSettings(savedSettings);
     settingsReplaced(); // GCB: the text colour for the restored settings
     applyCss();
-    if (savedRaw == null) Spicetify.LocalStorage.remove(STORAGE_KEY);
-    else Spicetify.LocalStorage.set(STORAGE_KEY, savedRaw);
     setPresets(savedPresets);
-    if (savedPresetsRaw == null) Spicetify.LocalStorage.remove(PRESETS_KEY);
-    else Spicetify.LocalStorage.set(PRESETS_KEY, savedPresetsRaw);
+    useTestKeys(false);
   };
-  return { rootStyle, restoreButton, restore };
+  const checkRealKeys = (check) => {
+    const after = realKeys();
+    const changed = [STORAGE_KEY, PRESETS_KEY].filter((key, i) => after[i] !== realBefore[i]);
+    const left = Object.values(TEST_KEYS).filter((key) => Spicetify.LocalStorage.get(key) != null);
+    check("gradient-bars#13", "The real settings and presets keys are byte-identical before and after the run; the self-test keys are gone",
+      !changed.length && !left.length,
+      changed.length || left.length
+        ? [changed.length && `changed: ${changed.join(", ")}`, left.length && `left: ${left.join(", ")}`].filter(Boolean).join("; ")
+        : `${STORAGE_KEY} ${realBefore[0]?.length ?? "absent"}, ${PRESETS_KEY} ${realBefore[1]?.length ?? "absent"} characters, unchanged`);
+  };
+  return { rootStyle, restoreButton, restore, checkRealKeys };
 }
 
 let selfTestRunning = false;

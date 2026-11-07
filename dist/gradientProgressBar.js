@@ -82,6 +82,27 @@
   var MAX_PRESETS = 12;
   var PRESET_NAME_MAX = 24;
 
+  // src/shared/keys.js
+  var TEST_KEYS = { settings: `${P}:selftest:settings`, presets: `${P}:selftest:presets` };
+  var testKeys = false;
+  var settingsKey = () => testKeys ? TEST_KEYS.settings : STORAGE_KEY;
+  var presetsKey = () => testKeys ? TEST_KEYS.presets : PRESETS_KEY;
+  function removeTestKeys() {
+    Spicetify.LocalStorage.remove(TEST_KEYS.settings);
+    Spicetify.LocalStorage.remove(TEST_KEYS.presets);
+  }
+  function useTestKeys(on) {
+    if (on) {
+      for (const [real, test] of [[STORAGE_KEY, TEST_KEYS.settings], [PRESETS_KEY, TEST_KEYS.presets]]) {
+        const value = Spicetify.LocalStorage.get(real);
+        if (value == null) Spicetify.LocalStorage.remove(test);
+        else Spicetify.LocalStorage.set(test, value);
+      }
+    }
+    testKeys = on;
+    if (!on) removeTestKeys();
+  }
+
   // src/shared/clipboard.js
   var CLIPBOARD_TIMEOUT_MS = 1500;
   var copyContainer = () => document.body;
@@ -767,7 +788,7 @@ ${REORDER_HINT}` : "");
     const valid = validateSettings({ ...entry.settings, version: SCHEMA_VERSION });
     return valid && { id: entry.id, name, settings: snapshot(valid) };
   }
-  function loadPresets(raw = Spicetify.LocalStorage.get(PRESETS_KEY)) {
+  function loadPresets(raw = Spicetify.LocalStorage.get(presetsKey())) {
     if (raw == null) return [];
     let data = null;
     try {
@@ -790,7 +811,7 @@ ${REORDER_HINT}` : "");
     return list;
   }
   function savePresets() {
-    Spicetify.LocalStorage.set(PRESETS_KEY, JSON.stringify({ version: PRESETS_VERSION, presets }));
+    Spicetify.LocalStorage.set(presetsKey(), JSON.stringify({ version: PRESETS_VERSION, presets }));
   }
   function uniqueName(name, list = presets, exceptId = null) {
     const base = name.trim().slice(0, PRESET_NAME_MAX);
@@ -1592,7 +1613,7 @@ ${OPTION_ROW_CSS.trim()}
     }
     return current;
   }
-  function loadSettings(raw = Spicetify.LocalStorage.get(STORAGE_KEY)) {
+  function loadSettings(raw = Spicetify.LocalStorage.get(settingsKey())) {
     if (raw == null) return defaultSettings();
     let data = null;
     try {
@@ -1607,7 +1628,7 @@ ${OPTION_ROW_CSS.trim()}
     }
     console.warn(`[${P}] Saved settings were invalid and have been reset to defaults.`);
     const defaults = defaultSettings();
-    Spicetify.LocalStorage.set(STORAGE_KEY, JSON.stringify(defaults));
+    Spicetify.LocalStorage.set(settingsKey(), JSON.stringify(defaults));
     return defaults;
   }
   var saveTimer = 0;
@@ -1619,7 +1640,7 @@ ${OPTION_ROW_CSS.trim()}
     if (!saveTimer) return;
     clearTimeout(saveTimer);
     saveTimer = 0;
-    Spicetify.LocalStorage.set(STORAGE_KEY, JSON.stringify(settings));
+    Spicetify.LocalStorage.set(settingsKey(), JSON.stringify(settings));
   }
   function cancelSave() {
     clearTimeout(saveTimer);
@@ -2278,10 +2299,12 @@ ${OPTION_ROW_CSS.trim()}
     }
   }
   function saveTestState() {
+    flushSettings();
+    const realKeys = () => [STORAGE_KEY, PRESETS_KEY].map((key) => Spicetify.LocalStorage.get(key));
+    const realBefore = realKeys();
+    useTestKeys(true);
     const savedSettings = structuredClone(settings);
-    const savedRaw = Spicetify.LocalStorage.get(STORAGE_KEY);
     const savedPresets = structuredClone(presets);
-    const savedPresetsRaw = Spicetify.LocalStorage.get(PRESETS_KEY);
     const style = document.documentElement.style;
     const savedButton = [style.getPropertyValue("--spice-button"), style.getPropertyPriority("--spice-button")];
     let probe = null;
@@ -2310,13 +2333,21 @@ ${OPTION_ROW_CSS.trim()}
       setSettings(savedSettings);
       settingsReplaced();
       applyCss();
-      if (savedRaw == null) Spicetify.LocalStorage.remove(STORAGE_KEY);
-      else Spicetify.LocalStorage.set(STORAGE_KEY, savedRaw);
       setPresets(savedPresets);
-      if (savedPresetsRaw == null) Spicetify.LocalStorage.remove(PRESETS_KEY);
-      else Spicetify.LocalStorage.set(PRESETS_KEY, savedPresetsRaw);
+      useTestKeys(false);
     };
-    return { rootStyle, restoreButton, restore };
+    const checkRealKeys = (check) => {
+      const after = realKeys();
+      const changed = [STORAGE_KEY, PRESETS_KEY].filter((key, i) => after[i] !== realBefore[i]);
+      const left = Object.values(TEST_KEYS).filter((key) => Spicetify.LocalStorage.get(key) != null);
+      check(
+        "gradient-bars#13",
+        "The real settings and presets keys are byte-identical before and after the run; the self-test keys are gone",
+        !changed.length && !left.length,
+        changed.length || left.length ? [changed.length && `changed: ${changed.join(", ")}`, left.length && `left: ${left.join(", ")}`].filter(Boolean).join("; ") : `${STORAGE_KEY} ${realBefore[0]?.length ?? "absent"}, ${PRESETS_KEY} ${realBefore[1]?.length ?? "absent"} characters, unchanged`
+      );
+    };
+    return { rootStyle, restoreButton, restore, checkRealKeys };
   }
   var selfTestRunning = false;
   async function runSelfTest(options = {}, suite) {
@@ -3852,7 +3883,7 @@ ${REORDER_HINT}`)),
     );
     stillOpen("choosing Slide");
     await sleep(SAVE_DELAY + 100);
-    const savedMode = JSON.parse(Spicetify.LocalStorage.get(STORAGE_KEY) ?? "{}").mode;
+    const savedMode = JSON.parse(Spicetify.LocalStorage.get(settingsKey()) ?? "{}").mode;
     check(15, "The chosen mode is saved", savedMode === "slide", `stored mode ${savedMode}`);
     realClick(modeBtn("compress"));
     modeBtn("compress").focus();
@@ -3925,8 +3956,8 @@ ${REORDER_HINT}`)),
     check(
       21,
       "Presets store: save → load round-trip in gpb:presets (theme and custom stops, gradient, mode); gpb:settings untouched",
-      JSON.stringify(reloadedPresets) === JSON.stringify(presets) && !reloadWarnings && JSON.parse(Spicetify.LocalStorage.get(PRESETS_KEY)).version === PRESETS_VERSION,
-      `${names(reloadedPresets)}; ${reloadWarnings} warning(s); ${Spicetify.LocalStorage.get(PRESETS_KEY).length} characters`
+      JSON.stringify(reloadedPresets) === JSON.stringify(presets) && !reloadWarnings && JSON.parse(Spicetify.LocalStorage.get(presetsKey())).version === PRESETS_VERSION,
+      `${names(reloadedPresets)}; ${reloadWarnings} warning(s); ${Spicetify.LocalStorage.get(presetsKey()).length} characters`
     );
     const [kept, dropWarnings] = gpbWarnings(() => loadPresets(presetsJson([
       own("p1", "  Good  ", sampleA),
@@ -4323,7 +4354,7 @@ ${threeColours}	 `), "");
     await tick();
     const mineId = presets[0]?.id;
     const mineChip = mineId && chipOf(mineId);
-    const storedPresets = JSON.parse(Spicetify.LocalStorage.get(PRESETS_KEY) ?? "{}").presets ?? [];
+    const storedPresets = JSON.parse(Spicetify.LocalStorage.get(presetsKey()) ?? "{}").presets ?? [];
     check(
       21,
       "Enter saves the current settings as 'Mine' (stored), its chip appears after the built-ins, active and focused",
@@ -4406,7 +4437,7 @@ ${threeColours}	 `), "");
     check(
       21,
       `Delete removes the preset at once (storage too); 'Deleted "Fairy (2)" · Undo'; the menu item stays connected`,
-      presets.length === 1 && !chipOf(mineId) && !Spicetify.LocalStorage.get(PRESETS_KEY).includes('"Fairy (2)"') && undoShows('Deleted "Fairy (2)"') && deleteNode.isConnected,
+      presets.length === 1 && !chipOf(mineId) && !Spicetify.LocalStorage.get(presetsKey()).includes('"Fairy (2)"') && undoShows('Deleted "Fairy (2)"') && deleteNode.isConnected,
       `${names(presets)}; ${undoState()}`
     );
     stillOpen("deleting a preset");
@@ -4416,7 +4447,7 @@ ${threeColours}	 `), "");
     check(
       21,
       "Undo after Delete restores the preset in its old place, in storage too",
-      JSON.stringify(presets) === beforeDelete && Spicetify.LocalStorage.get(PRESETS_KEY) === presetsJson(JSON.parse(beforeDelete)) && chipIds().startsWith(`b:void,b:sunset,b:aurora,b:neon,b:fairy,${mineId},`),
+      JSON.stringify(presets) === beforeDelete && Spicetify.LocalStorage.get(presetsKey()) === presetsJson(JSON.parse(beforeDelete)) && chipIds().startsWith(`b:void,b:sunset,b:aurora,b:neon,b:fairy,${mineId},`),
       `${names(presets)}; ${chipIds()}`
     );
     stillOpen("Undo after deleting");
@@ -4664,7 +4695,7 @@ ${threeColours}	 `), "");
       `${JSON.stringify(legacy.loaded)}, ${legacy.ours} warning(s)`
     );
     setTestSettings(true, [theme("s1"), custom("s2", RED), custom("s4", BLUE)], "anchored");
-    const writtenAtOnce = Spicetify.LocalStorage.get(STORAGE_KEY) === JSON.stringify(settings);
+    const writtenAtOnce = Spicetify.LocalStorage.get(settingsKey()) === JSON.stringify(settings);
     await new Promise((r) => setTimeout(r, SAVE_DELAY + 100));
     const reloaded = loadSettings();
     check(
@@ -4807,6 +4838,7 @@ ${threeColours}	 `), "");
         check(23, "Self-test ran to completion", false, e?.stack || e);
       } finally {
         state.restore();
+        state.checkRealKeys(check);
       }
       return env;
     });
@@ -4827,6 +4859,7 @@ ${threeColours}	 `), "");
     const waiting = waitForSpicetify();
     if (waiting) await waiting;
     try {
+      removeTestKeys();
       setSettings(loadSettings());
       setPresets(loadPresets());
       window.addEventListener("beforeunload", flushSettings);

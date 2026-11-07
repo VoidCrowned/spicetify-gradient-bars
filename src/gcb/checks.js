@@ -11,6 +11,8 @@ import { APPLY_LABEL, COPIED_LABEL, COPIED_MS, EXPORT_LABEL, EXPORT_TITLE, IMPOR
 import { BUILT_IN_PRESETS, addPreset, deletePreset, loadPresets, matchesPreset, presetSettings, presets, renamePreset, sameSettings, savePresets, setPresets, uniqueName, updatePreset } from "../shared/presets.js";
 import { RESET_CONFIRM_LABEL, RESET_CONFIRM_MS } from "../shared/reset.js";
 import { BLUE, GREEN, PROBE, RED, computedHex, custom, styleText, theme, tick, waitFor, withoutTransitions } from "../shared/selftest.js";
+import { presetsKey, settingsKey } from "../shared/keys.js";
+import { createResults, summarise } from "../shared/report.js";
 import { loadSettings, setSettings, settings, update } from "../shared/settings.js";
 import { api, sleep, startup } from "../shared/startup.js";
 import { STOP_GAP, closePopover, dotEl, popover, selectStop } from "../shared/stop-editor.js";
@@ -200,6 +202,32 @@ export async function checkEntries(check, skip) {
     `live entries ${window.__gradientBars?.entries.map((e) => e.id).join() ?? "none"}`);
 }
 
+// #14: remote playback can stop mid-run, and the Connect bar goes with it. Checks that need the
+// bar re-check it before they start and record their result through barChecker(): once the bar
+// the run started with is gone, the result is skipped (BAR_GONE) instead of failed.
+export const BAR_GONE = "Connect bar gone mid-run";
+const barStillThere = (bar) => !!bar?.isConnected && findBar() === bar;
+export const barChecker = (check, skip, present) => (issue, name, pass, detail) =>
+  present() ? check(issue, name, pass, detail) : skip(issue, name, BAR_GONE);
+
+// Simulates the bar disappearing mid-run (#14), with its own results.
+export function checkBarGone(check) {
+  const sim = createResults();
+  let present = true;
+  const barCheck = barChecker(sim.check, sim.skip, () => present);
+  barCheck(3, "before", false, "a real failure");
+  present = false; // the bar disappears
+  barCheck(3, "after, failing", false, "bar  , icon 0×0");
+  barCheck(3, "after, passing", true);
+  const [before, failing, passing] = sim.results;
+  const detached = document.createElement("div");
+  check("gradient-bars#14", "Bar gone mid-run: later bar checks are skipped (\"Connect bar gone mid-run\"), not failed; earlier results stay",
+    before.pass === false && [failing, passing].every((r) => r.pass === null && r.skipped === BAR_GONE) &&
+      summarise(sim.results) === "0/1 passed, 2 skipped, 1 FAILED" && !barStillThere(detached) && !barStillThere(null) &&
+      (!findBar() || barStillThere(findBar())),
+    `${summarise(sim.results)}; detached element counts as gone ${!barStillThere(detached)}`);
+}
+
 export async function runChecks(check, skip, rootStyle, restoreButton) {
   // ── Selector (GCB #3) ──
   const scoped = document.querySelectorAll(SELECTOR).length;
@@ -210,6 +238,8 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
   else if (!scoped) skip(3, "Selector finds exactly one bar");
   else check(3, "Selector finds exactly one bar", true, counts);
   const bar = scoped === 1 ? findBar() : null;
+  const barCheck = barChecker(check, skip, () => barStillThere(bar)); // #14
+  const gone = () => bar && !barStillThere(bar);
 
   // ── Gradient builder (GCB #3, GCB #4) ──
   const css = (gradient, stops, text = null) => buildCss({ version: SCHEMA_VERSION, gradient, textColour: DEFAULT_TEXT, stops }, text);
@@ -285,6 +315,7 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
     "Theme stop on the live bar follows a runtime --spice-button change, no JS",
   ];
   if (!bar) barChecks.forEach((name) => skip(3, name));
+  else if (gone()) barChecks.forEach((name) => skip(3, name, BAR_GONE));
   else {
     const styleBefore = bar.getAttribute("style");
     const gradients = [
@@ -299,15 +330,15 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
       const want = computedImage(image(gradient, stops));
       if (got !== want) mismatches.push(`${got} (expected ${want})`);
     }
-    check(3, barChecks[0], !mismatches.length, mismatches.join("; ") || `${gradients.length} gradients`);
+    barCheck(3, barChecks[0], !mismatches.length, mismatches.join("; ") || `${gradients.length} gradients`);
     const geometry = barWithAndWithout(bar, barGeometry);
-    check(3, barChecks[1], geometry.ours === geometry.spotify, `ours ${geometry.ours}; Spotify's ${geometry.spotify}`);
-    check(3, barChecks[2], bar.getAttribute("style") === styleBefore, `style="${bar.getAttribute("style") ?? ""}"`);
+    barCheck(3, barChecks[1], geometry.ours === geometry.spotify, `ours ${geometry.ours}; Spotify's ${geometry.spotify}`);
+    barCheck(3, barChecks[2], bar.getAttribute("style") === styleBefore, `style="${bar.getAttribute("style") ?? ""}"`);
     setTestSettings(true, [theme("s1"), theme("s2")]);
     rootStyle.setProperty("--spice-button", PROBE, "important");
     const followed = getComputedStyle(bar).backgroundImage;
     restoreButton();
-    check(4, barChecks[3], followed.includes("rgb(18, 52, 86)"), followed);
+    barCheck(4, barChecks[3], followed.includes("rgb(18, 52, 86)"), followed);
   }
 
   // ── Right-click (GCB #5) ──
@@ -330,12 +361,13 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
   check(5, "Right-click elsewhere (the page, the now-playing aside around the bar) doesn't open the settings",
     !openedElsewhere.length, `${elsewhere.length} targets${openedElsewhere.length ? `, opened on ${openedElsewhere.map((el) => el.tagName.toLowerCase()).join(", ")}` : ""}`);
   if (!bar) skip(5, "Right-click on the bar opens the settings and suppresses Spotify's menu");
+  else if (gone()) skip(5, "Right-click on the bar opens the settings and suppresses Spotify's menu", BAR_GONE);
   else {
     const target = bar.querySelector(BAR_LINK)?.querySelector("span") ?? bar;
     const kept = contextMenu(target);
     const opened = !!modal?.root.isConnected;
     closeIfOpen();
-    check(5, "Right-click on the bar opens the settings and suppresses Spotify's menu", opened && !kept,
+    barCheck(5, "Right-click on the bar opens the settings and suppresses Spotify's menu", opened && !kept,
       `opened ${opened}, default prevented ${!kept}`);
   }
 
@@ -429,7 +461,8 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
       setTextRegion(keptRegion);
       recalcTextColour();
     }
-  } else {
+  } else if (gone()) textChecks.forEach((name) => skip(textChecks.indexOf(name) ? 14 : 12, name, BAR_GONE));
+  else {
     const link = bar.querySelector(BAR_LINK);
     const span = link?.querySelector("span") ?? link;
     const icon = bar.querySelector(BAR_ICON);
@@ -440,7 +473,7 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
     const left = box.left + bar.clientLeft;
     const iconFrom = (icon.getBoundingClientRect().left - left) / width;
     const linkTo = (link.getBoundingClientRect().right - left) / width;
-    check(12, textChecks[0],
+    barCheck(12, textChecks[0],
       textResult.measured && about(r.from, iconFrom, 0.001) && about(r.to, linkTo, 0.001) && r.from < r.to && r.from > 0.5 && r.to <= 1,
       `${r.from.toFixed(3)}–${r.to.toFixed(3)} of ${width} px (icon ${iconFrom.toFixed(3)}, text ends ${linkTo.toFixed(3)})`);
     const shown = () => ({ text: computedHex(span, "color"), icon: toHex(getComputedStyle(icon).fill) });
@@ -451,10 +484,10 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
       return got.text !== want || got.icon !== want || appliedTextColour() !== want;
     }).map(([mode, colour, want]) => `${mode} on ${colour}: expected ${want}`);
     const last = shown();
-    check(14, textChecks[1], !wrongText.length, wrongText.join("; ") || `${cases.length} cases; last: text ${last.text}, icon ${last.icon}`);
+    barCheck(14, textChecks[1], !wrongText.length, wrongText.join("; ") || `${cases.length} cases; last: text ${last.text}, icon ${last.icon}`);
     setTestSettings(true, [custom("s1", "#202020"), custom("s2", "#303030")], "default");
     const spotify = barWithAndWithout(bar, () => JSON.stringify(shown()));
-    check(14, textChecks[2], spotify.ours === spotify.spotify && !styleText().includes("--text-base") && appliedTextColour() === null,
+    barCheck(14, textChecks[2], spotify.ours === spotify.spotify && !styleText().includes("--text-base") && appliedTextColour() === null,
       `ours ${spotify.ours}, Spotify's ${spotify.spotify}`);
   }
 
@@ -948,7 +981,7 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
   stillOpen("changing the text colour");
   realClick(m.textButtons[1]);
   await sleep(SAVE_DELAY + 100);
-  const storedText = JSON.parse(Spicetify.LocalStorage.get(STORAGE_KEY) ?? "{}").textColour;
+  const storedText = JSON.parse(Spicetify.LocalStorage.get(settingsKey()) ?? "{}").textColour;
   check(11, "The chosen text colour is saved", storedText === "black", `stored ${storedText}`);
   realClick(m.textButtons[0]);
 
@@ -996,8 +1029,8 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
   const [reloadedPresets, reloadWarnings] = gcbWarnings(() => loadPresets());
   check(29, "Presets store: save → load round-trip in gcb:presets (theme and custom stops, gradient, text colour); gcb:settings untouched",
     JSON.stringify(reloadedPresets) === JSON.stringify(presets) && !reloadWarnings && PRESETS_KEY === "gcb:presets" &&
-      JSON.parse(Spicetify.LocalStorage.get(PRESETS_KEY)).version === PRESETS_VERSION,
-    `${names(reloadedPresets)}; ${reloadWarnings} warning(s); ${Spicetify.LocalStorage.get(PRESETS_KEY).length} characters`);
+      JSON.parse(Spicetify.LocalStorage.get(presetsKey())).version === PRESETS_VERSION,
+    `${names(reloadedPresets)}; ${reloadWarnings} warning(s); ${Spicetify.LocalStorage.get(presetsKey()).length} characters`);
   const [kept, dropWarnings] = gcbWarnings(() => loadPresets(presetsJson([
     own("p1", "  Good  ", sampleA),
     own("p2", "Bad hex", { ...sampleA, stops: [custom("s1", "#12345")] }),
@@ -1259,7 +1292,7 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
   const mineChip = mineId && chipOf(mineId);
   check(29, "+ Save: an inline name field ('Preset 1'); Escape cancels; Enter saves 'Mine' with the text colour, its chip in row 2, active and focused",
     nameShown && cancelled && presets.length === 1 && presets[0].name === "Mine" && presets[0].settings.textColour === "default" &&
-      JSON.parse(Spicetify.LocalStorage.get(PRESETS_KEY) ?? "{}").presets?.[0]?.settings.textColour === "default" &&
+      JSON.parse(Spicetify.LocalStorage.get(presetsKey()) ?? "{}").presets?.[0]?.settings.textColour === "default" &&
       rowsSplit([mineId]) && mineChip?.getAttribute("aria-pressed") === "true" && document.activeElement === mineChip && m.saveChip === saveNode,
     `field ${nameShown}, cancelled ${cancelled}; ${chipIds()}; pressed ${pressed()}`);
   stillOpen("saving a preset");
@@ -1312,7 +1345,7 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
   await tick();
   await tick();
   check(29, "Delete at once with 'Deleted \"…\" · Undo'; Undo restores the preset in its old place, in storage too",
-    deleted && JSON.stringify(presets) === beforeDelete && Spicetify.LocalStorage.get(PRESETS_KEY) === presetsJson(JSON.parse(beforeDelete)),
+    deleted && JSON.stringify(presets) === beforeDelete && Spicetify.LocalStorage.get(presetsKey()) === presetsJson(JSON.parse(beforeDelete)),
     `deleted ${deleted}; ${names(presets)}`);
   stillOpen("deleting a preset");
   while (presets.length < MAX_PRESETS) addPreset("Fill");
@@ -1445,13 +1478,14 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
     getComputedStyle(pv).backgroundImage === "none" && toHex(getComputedStyle(pv).backgroundColor) === barBase(),
     `${getComputedStyle(pv).backgroundImage}, ${getComputedStyle(pv).backgroundColor}`);
   if (!bar) skip(7, "Preview label matches the bar's text size, weight and icon size");
+  else if (gone()) skip(7, "Preview label matches the bar's text size, weight and icon size", BAR_GONE);
   else {
     const link = bar.querySelector(BAR_LINK);
     const span = link?.querySelector("span") ?? link;
     const icon = bar.querySelector(BAR_ICON);
     const fontOf = (el) => `${getComputedStyle(el).fontSize} ${getComputedStyle(el).fontWeight}`;
     const size = (el) => `${el.getBoundingClientRect().width.toFixed(0)}×${el.getBoundingClientRect().height.toFixed(0)}`;
-    check(7, "Preview label matches the bar's text size, weight and icon size",
+    barCheck(7, "Preview label matches the bar's text size, weight and icon size",
       fontOf(span) === fontOf(m.previewLabel) && size(icon) === size(m.previewIcon),
       `bar ${fontOf(span)}, icon ${size(icon)}; preview ${fontOf(m.previewLabel)}, icon ${size(m.previewIcon)}`);
   }
@@ -1501,10 +1535,10 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
   check(2, "Corrupt or old stored settings → defaults + exactly one [gcb] warning each", !wrongLoads.length,
     wrongLoads.map(([label, { ours }]) => `${label}: ${ours} warning(s)`).join("; ") || `${Object.keys(invalid).length} cases`);
   const newer = JSON.stringify({ version: SCHEMA_VERSION + 1, gradient: true, stops: [theme("s1")] });
-  Spicetify.LocalStorage.set(STORAGE_KEY, newer);
+  Spicetify.LocalStorage.set(settingsKey(), newer);
   const fromNewer = loadQuietly(newer);
   check(2, "Settings from a newer version → defaults + one warning; the stored value is left alone",
-    JSON.stringify(fromNewer.loaded) === JSON.stringify(defaultSettings()) && fromNewer.ours === 1 && Spicetify.LocalStorage.get(STORAGE_KEY) === newer,
+    JSON.stringify(fromNewer.loaded) === JSON.stringify(defaultSettings()) && fromNewer.ours === 1 && Spicetify.LocalStorage.get(settingsKey()) === newer,
     `${fromNewer.ours} warning(s)`);
   MIGRATIONS[0] = (data) => ({ ...data, version: 1, stops: data.colours.map((color, i) => custom(`s${i + 1}`, color)) });
   let migrated;
@@ -1535,7 +1569,7 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
   check(2, "Migration 1 → 2: only transparent stops → the defaults",
     JSON.stringify(allClear.loaded) === JSON.stringify(defaultSettings()) && !allClear.ours, loaded(allClear));
   setTestSettings(true, [theme("s1"), custom("s2", RED), custom("s4", BLUE)], "white");
-  const writtenAtOnce = Spicetify.LocalStorage.get(STORAGE_KEY) === JSON.stringify(settings);
+  const writtenAtOnce = Spicetify.LocalStorage.get(settingsKey()) === JSON.stringify(settings);
   await sleep(SAVE_DELAY + 100);
   const reloaded = loadSettings();
   check(2, "Saves are debounced, then a load returns identical settings (round-trip, theme and custom stops, the text colour)",

@@ -13,6 +13,7 @@
 import { COPY, claimBar } from "../shared/claim.js";
 import { entryText, joinGradientBars, registerSpicetifyEntries, setShared } from "../shared/entry.js";
 import { loadPresets, setPresets } from "../shared/presets.js";
+import { removeTestKeys } from "../shared/keys.js";
 import { flushSettings, loadSettings, setSettings } from "../shared/settings.js";
 import { startup, waitForSpicetify } from "../shared/startup.js";
 import { VERSION } from "./config.js";
@@ -40,6 +41,7 @@ export async function main() {
   if (waiting) await waiting;
 
   try {
+    removeTestKeys(); // left over from a self-test that didn't end normally (#13)
     setSettings(loadSettings());
     setPresets(loadPresets()); // GCB #29
     window.addEventListener("beforeunload", flushSettings);

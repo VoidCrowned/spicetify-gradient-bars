@@ -161,6 +161,7 @@ export function selfTest(options) {
       check(23, "Self-test ran to completion", false, e?.stack || e);
     } finally {
       state.restore();
+      state.checkRealKeys(check); // #13
     }
     return env;
   });

@@ -1,13 +1,14 @@
 // Presets (GPB #21, GCB #29): five built-ins and up to 12 of the user's own, in their own
-// storage key (PRESETS_KEY) with their own version.
+// storage key (presetsKey(): PRESETS_KEY, or its self-test key, #13) with their own version.
 
 // Colours only, all fixed (no theme stops): applying one keeps the current EXTRA_KEY setting (the
 // Spread mode, the text colour). They can't be renamed or deleted, and they have their own chip
 // row (GPB #53). Both extensions have the same five.
 
-import { EXTRA_KEY, P, PRESETS_KEY, SCHEMA_VERSION } from "ext:config";
+import { EXTRA_KEY, P, SCHEMA_VERSION } from "ext:config";
 import { validateSettings } from "ext:hooks";
 import { MAX_PRESETS, PRESETS_VERSION, PRESET_NAME_MAX } from "./constants.js";
+import { presetsKey } from "./keys.js";
 import { settings } from "./settings.js";
 
 export const BUILT_IN_PRESETS = [
@@ -61,7 +62,7 @@ function validatePreset(entry) {
 
 // Invalid entries (and any beyond 12) are dropped with one warning; an unreadable key gives
 // an empty list and one warning. Storage is only rewritten by the next change.
-export function loadPresets(raw = Spicetify.LocalStorage.get(PRESETS_KEY)) {
+export function loadPresets(raw = Spicetify.LocalStorage.get(presetsKey())) {
   if (raw == null) return [];
   let data = null;
   try {
@@ -84,7 +85,7 @@ export function loadPresets(raw = Spicetify.LocalStorage.get(PRESETS_KEY)) {
 }
 
 export function savePresets() {
-  Spicetify.LocalStorage.set(PRESETS_KEY, JSON.stringify({ version: PRESETS_VERSION, presets }));
+  Spicetify.LocalStorage.set(presetsKey(), JSON.stringify({ version: PRESETS_VERSION, presets }));
 }
 
 // Trimmed, at most 24 characters, and unique among the built-ins and `list` (case-insensitive,

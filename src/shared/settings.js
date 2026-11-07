@@ -1,12 +1,13 @@
-// The settings store: one object per extension in Spicetify.LocalStorage (STORAGE_KEY), loaded
+// The settings store: one object per extension in Spicetify.LocalStorage (settingsKey(): STORAGE_KEY, or its self-test key, #13), loaded
 // through the extension's migrations and validateSettings(), applied on every change and saved
 // debounced.
 
 // The current settings. Only this module assigns it; everything else calls setSettings().
 
-import { KEEP_NEWER_SETTINGS, P, SCHEMA_VERSION, STORAGE_KEY } from "ext:config";
+import { KEEP_NEWER_SETTINGS, P, SCHEMA_VERSION } from "ext:config";
 import { MIGRATIONS, afterSettingsChange, applyCss, defaultSettings, renderPreview, validateSettings } from "ext:hooks";
 import { SAVE_DELAY, THEME_COLOUR } from "./constants.js";
+import { settingsKey } from "./keys.js";
 import { modal, renderModal } from "./modal.js";
 import { clearUndo, pendingUndo, renderPresetStates } from "./presets-ui.js";
 
@@ -30,7 +31,7 @@ function migrate(data) {
 // Invalid data → defaults (written back) and one warning. Settings from a newer version of the
 // extension → with KEEP_NEWER_SETTINGS defaults too, but the stored value is left alone until
 // the next save; without it they count as invalid.
-export function loadSettings(raw = Spicetify.LocalStorage.get(STORAGE_KEY)) {
+export function loadSettings(raw = Spicetify.LocalStorage.get(settingsKey())) {
   if (raw == null) return defaultSettings();
 
   let data = null;
@@ -46,7 +47,7 @@ export function loadSettings(raw = Spicetify.LocalStorage.get(STORAGE_KEY)) {
   }
   console.warn(`[${P}] Saved settings were invalid and have been reset to defaults.`);
   const defaults = defaultSettings();
-  Spicetify.LocalStorage.set(STORAGE_KEY, JSON.stringify(defaults));
+  Spicetify.LocalStorage.set(settingsKey(), JSON.stringify(defaults));
   return defaults;
 }
 
@@ -62,7 +63,7 @@ export function flushSettings() {
   if (!saveTimer) return;
   clearTimeout(saveTimer);
   saveTimer = 0;
-  Spicetify.LocalStorage.set(STORAGE_KEY, JSON.stringify(settings));
+  Spicetify.LocalStorage.set(settingsKey(), JSON.stringify(settings));
 }
 
 // Drops a pending save without writing it (the self-test, before it restores the stored value).

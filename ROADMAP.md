@@ -31,7 +31,7 @@ Agreed ideas, not scheduled. Tracking: [#10](https://github.com/VoidCrowned/spic
 | [#9](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/9) | Custom stop positions on the Connect bar | GCB |
 | [#11](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/11) | One settings window for Gradient Bars | GB |
 
-Open bugs without a milestone: [#13](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/13) (self-tests restore every key), [#14](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/14) (skip Connect bar checks if the bar vanishes).
+Open bugs without a milestone: none.
 
 ## Not planned
 
