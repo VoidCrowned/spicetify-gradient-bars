@@ -53,6 +53,7 @@ export function decodeShareCode(text, current = settings) {
     version: SCHEMA_VERSION,
     gradient: data.g === 1 ? true : data.g === 0 ? false : null,
     [EXTRA_KEY]: extra,
+    hover: current.hover, // not in codes (#3, #8): an import keeps the current hover effect
     stops: data.s.map((value, i) =>
       value === "t"
         ? { id: `s${i + 1}`, kind: "theme" }

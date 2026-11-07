@@ -4,6 +4,7 @@
 
 // The Text colour row and its radio buttons, and the preview strip: the bar with a fake label.
 
+import { HOVER_ROW_CSS, enableHoverRow, hoverRefs, hoverRowMarkup, renderHoverRow } from "../shared/hover.js";
 import { labelOnLight, parseRgb, rgbToHex, rootColour } from "../shared/colour.js";
 import { modal, openModal, withClass } from "../shared/modal.js";
 import { previewing } from "../shared/presets-ui.js";
@@ -13,7 +14,7 @@ import { barImage } from "./render.js";
 import { TEXT_MODES } from "./settings.js";
 import { appliedTextColour, gradientSamples, pickTextColour, recalcTextColour, scheduleTextColour, textContext, textRegion, textResult } from "./text-colour.js";
 
-export const OPTION_ROW_CSS = `
+export const OPTION_ROW_CSS = HOVER_ROW_CSS + `
 .gcb-text { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
 .gcb-modes { display: flex; gap: 2px; padding: 2px; border-radius: 500px; background-color: rgba(var(--spice-rgb-text), .1); }
 .gcb-mode { padding: 4px 12px; border: 1px solid transparent; border-radius: 500px; background: none; color: var(--spice-text); font: inherit; font-size: .875rem; font-weight: 700; white-space: nowrap; cursor: pointer; transition: background-color .15s; }
@@ -32,7 +33,7 @@ export function optionRowMarkup() {
       <div class="gcb-modes" role="radiogroup" aria-labelledby="gcb-text-label">
         ${TEXT_MODES.map((mode) => `<button type="button" class="gcb-mode" role="radio" data-mode="${mode}">${TEXT_LABELS[mode]}</button>`).join("")}
       </div>
-    </div>`;
+    </div>` + hoverRowMarkup();
 }
 
 export function previewMarkup() {
@@ -41,6 +42,7 @@ export function previewMarkup() {
 
 export function extraRefs(root) {
   return {
+    ...hoverRefs(root), // #3, #8
     text: root.querySelector(".gcb-text"),
     textLabel: root.querySelector("#gcb-text-label"),
     textModes: root.querySelector(".gcb-modes"),
@@ -52,16 +54,19 @@ export function extraRefs(root) {
 
 export function enableOptionRow(m) {
   enableTextColour(m);
+  enableHoverRow(m);
 }
 
 export function renderOptionRow() {
   renderTextColour();
+  renderHoverRow();
 }
 
 // The theme colour changed while the modal is open: the checked button's label colour depends
 // on the live --spice-button, and the preview on the bar's own colour.
 export function onThemeColour() {
   renderTextColour();
+  renderHoverRow();
   renderPreview();
 }
 

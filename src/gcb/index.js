@@ -13,6 +13,8 @@
 import { COPY, claimBar } from "../shared/claim.js";
 import { entryText, joinGradientBars, registerSpicetifyEntries, setShared } from "../shared/entry.js";
 import { loadPresets, setPresets } from "../shared/presets.js";
+import { watchReducedMotion } from "../shared/hover.js";
+import { applyCss } from "./render.js";
 import { removeTestKeys } from "../shared/keys.js";
 import { flushSettings, loadSettings, setSettings } from "../shared/settings.js";
 import { startup, waitForSpicetify } from "../shared/startup.js";
@@ -46,6 +48,7 @@ export async function main() {
     setPresets(loadPresets()); // GCB #29
     window.addEventListener("beforeunload", flushSettings);
     recalcTextColour(); // applies the stylesheet, text colour included, so there's no flash of the old one
+    watchReducedMotion(applyCss); // the hover transition (#8)
     watchTextTriggers();
     window.__gcb = { version: VERSION, copy: COPY, status: () => statusReport(), selfTest, openSettings };
     startup.entry = enableBarContextMenu();

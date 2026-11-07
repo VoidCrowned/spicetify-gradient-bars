@@ -32,11 +32,12 @@ function snapshot(s) {
   return { gradient: s.gradient, [EXTRA_KEY]: s[EXTRA_KEY], stops: s.stops.map((stop) => ({ ...stop })) };
 }
 
-// The settings a preset applies. A built-in keeps the current EXTRA_KEY setting.
+// The settings a preset applies. A built-in keeps the current EXTRA_KEY setting. Presets never
+// store the hover effect (#3, #8): every preset keeps the current one.
 export function presetSettings(preset, current = settings) {
-  if (!preset.builtIn) return { version: SCHEMA_VERSION, ...structuredClone(preset.settings) };
+  if (!preset.builtIn) return { version: SCHEMA_VERSION, ...structuredClone(preset.settings), hover: current.hover };
   const stops = preset.colours.map((color, i) => ({ id: `s${i + 1}`, kind: "custom", color }));
-  return { version: SCHEMA_VERSION, gradient: true, [EXTRA_KEY]: current[EXTRA_KEY], stops };
+  return { version: SCHEMA_VERSION, gradient: true, [EXTRA_KEY]: current[EXTRA_KEY], hover: current.hover, stops };
 }
 
 // Equal settings, ignoring stop ids. Built-ins therefore compare colours only (their EXTRA_KEY

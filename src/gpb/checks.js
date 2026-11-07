@@ -10,7 +10,8 @@ import { HEX_COPIED_MS, HEX_COPY_LABEL, copyHex, pickerHsv } from "../shared/pic
 import { APPLY_LABEL, COPIED_LABEL, COPIED_MS, COPY_HINT, EXPORT_LABEL, EXPORT_TITLE, IMPORT_ERROR, PREVIEW_CODE_MESSAGE, SAVE_FULL_LABEL, UNDO_MS, chipEl, copyCode, pendingUndo, renderChips } from "../shared/presets-ui.js";
 import { BUILT_IN_PRESETS, addPreset, deletePreset, loadPresets, presetSettings, presets, renamePreset, sameSettings, savePresets, setPresets, uniqueName, updatePreset } from "../shared/presets.js";
 import { RESET_CONFIRM_LABEL, RESET_CONFIRM_MS } from "../shared/reset.js";
-import { BLUE, GREEN, PROBE, RED, computedHex, custom, styleText, theme, tick, waitFor, withoutTransitions } from "../shared/selftest.js";
+import { BRIGHTEN, HOVER_TRANSITION, reducedMotion } from "../shared/hover.js";
+import { BLUE, GREEN, PROBE, RED, checkHoverRow, computedHex, custom, styleText, theme, tick, waitFor, withoutTransitions } from "../shared/selftest.js";
 import { presetsKey, settingsKey } from "../shared/keys.js";
 import { loadSettings, setSettings, settings, update } from "../shared/settings.js";
 import { api, sleep } from "../shared/startup.js";
@@ -19,7 +20,7 @@ import { findStop, selectedId, setStopColour } from "../shared/stops.js";
 import { ENTRY_LABEL, HELP_LINES, IMPORT_TITLE, SCHEMA_VERSION } from "./config.js";
 import { statusReport } from "./diagnostics.js";
 import { FILL, HANDLE, SCOPE, buildCss, fillImage } from "./render.js";
-import { barGeometry, barVars, cssProblems, fillTransforms, hasMaskAnimation, setTestSettings, songFill, songHandle, songchangeListeners, waveformActive } from "./selftest.js";
+import { HOVER_RULE, barGeometry, barVars, cssProblems, fillTransforms, hasMaskAnimation, setTestSettings, songFill, songHandle, songchangeListeners, waveformActive } from "./selftest.js";
 import { GCB_CODE_PREFIX, MODES, decodeCode, defaultSettings } from "./settings.js";
 import { MODE_LABELS, SPREAD_HINTS, SPREAD_OFF_HINT } from "./ui.js";
 
@@ -551,7 +552,7 @@ export async function runChecks(check, rootStyle, restoreButton) {
       `position ${getComputedStyle(m.picker).position}`);
 
   check(15, "Spread row sits between the Gradient row and the Presets row (#21): a radiogroup of three radio buttons",
-    m.spread.previousElementSibling === m.gradientRow && m.spread.nextElementSibling === m.presets &&
+    m.spread.previousElementSibling === m.gradientRow && m.spread.nextElementSibling === m.hover && m.hover.nextElementSibling === m.presets && // the Hover row (#3) in between
       m.modes.getAttribute("role") === "radiogroup" && m.modes.getAttribute("aria-labelledby") === "gpb-spread-label" &&
       m.modeButtons.length === 3 && m.modeButtons.every((b) => b.tagName === "BUTTON" && b.getAttribute("role") === "radio") &&
       m.modeButtons.map((b) => b.textContent).join() === "Compress,Anchored,Slide",
@@ -1256,6 +1257,8 @@ export async function runChecks(check, rootStyle, restoreButton) {
   check(15, "Spread keyboard: →, End, Home and ← (wrapping) change the mode and move focus; Alt+→ doesn't",
     !keySteps.some((step) => step.includes("expected")), keySteps.join(", "));
   stillOpen("changing Spread with the keyboard");
+  await checkHoverRow(check, m, { realClick, press, saveDelay: SAVE_DELAY }); // #3
+  stillOpen("changing the hover effect");
 
   setTestSettings(true, [custom("s1", RED), custom("s2", GREEN)], "anchored");
   const gradientSteps = [];
@@ -1455,7 +1458,7 @@ export async function runChecks(check, rootStyle, restoreButton) {
   const labelRect = m.presetsRow.querySelector(".gpb-label").getBoundingClientRect();
   const unreachableChips = [...m.chips.querySelectorAll(".gpb-chip"), m.exportButton, m.importButton].filter((el) => !reachable(el));
   check(21, "Presets row between Spread and the preview: label left, Export and Import right, every chip reachable",
-    m.presets.previousElementSibling === m.spread && m.presets.nextElementSibling === m.preview &&
+    m.presets.previousElementSibling === m.hover && m.hover.previousElementSibling === m.spread && m.presets.nextElementSibling === m.preview && // Hover (#3) under Spread
       Math.abs(labelRect.left - presetsRect.left) <= 1 && Math.abs(toolsRect.right - presetsRect.right) <= 1 && !unreachableChips.length,
     `after .${m.presets.previousElementSibling?.className}, before .${m.presets.nextElementSibling?.className}; ` +
       `tools ${(presetsRect.right - toolsRect.right).toFixed(1)} px from the right` +
@@ -1936,4 +1939,113 @@ export async function runChecks(check, rootStyle, restoreButton) {
   check(2, "Saves are debounced, then a load returns identical settings (mode included)",
     !writtenAtOnce && JSON.stringify(reloaded) === JSON.stringify(settings) && reloaded.mode === "anchored",
     `written at once ${writtenAtOnce}, reloaded mode ${reloaded.mode}`);
+}
+
+// ── Hover effect (#3): CSS, the live bar, the volume slider, playback-bar-waveform's tooltip ──
+const HOVER = "gradient-bars#3";
+
+// Our selectors with :hover taken out: what each rule applies to once the bar is hovered.
+const hoverTargets = (css) => [...css.matchAll(/([^{}]+)\{/g)].map(([, sel]) => sel.trim().replaceAll(":hover", ""));
+
+export function checkHoverCss(check, skip) {
+  const stops = [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)];
+  const samples = [
+    ...MODES.map((mode) => [`brighten, ${mode}`, { version: SCHEMA_VERSION, gradient: true, mode, hover: "brighten", stops }]),
+    ["brighten, solid", { version: SCHEMA_VERSION, gradient: false, mode: "compress", hover: "brighten", stops: [custom("s1", RED)] }],
+    ["brighten, inert theme colour", { ...defaultSettings(), hover: "brighten" }],
+  ];
+  const lint = samples.flatMap(([label, s]) => [false, true].flatMap((reduced) =>
+    cssProblems(buildCss(s, reduced), s.gradient ? s.mode : "compress").map((p) => `${label}${reduced ? " (reduced motion)" : ""}: ${p}`)));
+  check(HOVER, "Brighten passes the CSS lint in every Spread mode, solid and inert: filter only in the :hover rule, the transition only on the fill",
+    !lint.length, lint.join("; ") || `${samples.length * 2} stylesheets`);
+  const bright = buildCss(samples[0][1], false);
+  const reduced = buildCss(samples[0][1], true);
+  const none = buildCss({ ...samples[0][1], hover: "none" }, false);
+  const filterRules = [...bright.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(([, , body]) => body.includes("filter:")).map(([, sel]) => sel.trim());
+  check(HOVER, "The filter applies only under :hover; reduced motion drops the transition, not the effect; None adds nothing",
+    filterRules.length === 1 && filterRules[0] === HOVER_RULE && bright.includes(`transition: ${HOVER_TRANSITION};`) &&
+      !reduced.includes("transition") && reduced.includes(`filter: ${BRIGHTEN};`) && !/:hover|filter|transition/.test(none) &&
+      buildCss({ ...defaultSettings() }, false) === "" && buildCss({ ...defaultSettings(), hover: "brighten" }, false).includes(HOVER_RULE),
+    `filter rules: ${filterRules.join(", ") || "none"}; reduced: ${reduced.includes("transition") ? "transition kept" : "no transition"}`);
+  const lintFlags = {
+    "filter outside :hover": cssProblems(`${SCOPE} ${FILL} {\n  filter: ${BRIGHTEN};\n}\n`, "compress"),
+    "another filter": cssProblems(`${HOVER_RULE} {\n  filter: blur(4px);\n}\n`, "compress"),
+    "another transition": cssProblems(`${SCOPE} ${FILL} {\n  transition: all 1s;\n}\n`, "compress"),
+    "a pseudo-element": cssProblems(`${SCOPE} .x-progressBar-progressBarBg::before {\n  background-image: none;\n}\n`, "compress"),
+    ":hover elsewhere": cssProblems(`${SCOPE}:hover ${HANDLE} {\n  background-color: red;\n}\n`, "compress"),
+  };
+  const missed = Object.entries(lintFlags).filter(([, found]) => !found.length).map(([label]) => label);
+  check(HOVER, "The CSS lint flags a filter outside the hover rule, other filters and transitions, pseudo-elements and :hover elsewhere",
+    !missed.length, missed.length ? `not flagged: ${missed.join(", ")}` : Object.values(lintFlags).map((p) => p.join("/")).join("; "));
+
+  const fill = document.querySelector(`${SCOPE} ${FILL}`);
+  const names = [
+    "The hover rule targets the live song bar's fill, and at rest the fill isn't filtered",
+    "The volume slider never gets the hover effect: no rule of ours applies to it",
+    "playback-bar-waveform's hover tooltip (the handle's ::before) is the same with Brighten as without our stylesheet",
+  ];
+  if (!fill) return names.forEach((name) => skip(HOVER, name, "song progress bar not found"));
+  setTestSettings(true, stops, "compress", "brighten");
+  const css = styleText();
+  const targets = hoverTargets(css);
+  const hoverTarget = HOVER_RULE.replaceAll(":hover", "");
+  const parsed = [...(document.getElementById("gpb-style")?.sheet?.cssRules ?? [])].map((r) => r.selectorText);
+  const transition = getComputedStyle(fill).transition;
+  check(HOVER, names[0],
+    document.querySelector(hoverTarget) === fill && parsed.some((sel) => sel?.includes(":hover")) &&
+      (fill.matches(":hover") || getComputedStyle(fill).filter === "none") && (reducedMotion() || transition.includes("filter")),
+    `filter at rest ${getComputedStyle(fill).filter}${fill.matches(":hover") ? " (hovered now)" : ""}; transition ${transition}`);
+  const volumeFill = [...document.querySelectorAll(FILL)].find((el) => !el.closest(SCOPE));
+  if (!volumeFill) skip(HOVER, names[1], "volume slider not found");
+  else {
+    const hit = targets.filter((sel) => volumeFill.matches(sel) || [...volumeFill.parentElement.closest(".progress-bar")?.querySelectorAll("*") ?? []].some((el) => el.matches(sel)));
+    const read = () => `${getComputedStyle(volumeFill).filter} ${getComputedStyle(volumeFill).transition} ${getComputedStyle(volumeFill).backgroundImage}`;
+    const sheet = document.getElementById("gpb-style").sheet;
+    const ours = read();
+    sheet.disabled = true;
+    const spotify = read();
+    sheet.disabled = false;
+    check(HOVER, names[1], !hit.length && ours === spotify, hit.length ? `matched by ${hit.join(", ")}` : `filter, transition and image unchanged: ${ours}`);
+  }
+  const handle = document.querySelector(`${SCOPE} ${HANDLE}`);
+  if (!handle) skip(HOVER, names[2], "handle not found");
+  else {
+    const tooltip = () => {
+      const cs = getComputedStyle(handle, "::before");
+      return ["content", "display", "visibility", "filter", "position", "z-index", "transform", "color", "background-color"].map((p) => `${p} ${cs.getPropertyValue(p)}`).join("; ");
+    };
+    const touched = targets.filter((sel) => handle.matches(sel) || handle.querySelector(sel));
+    const sheet = document.getElementById("gpb-style").sheet;
+    // Page code can't hover the bar, so the hover rule is simulated: a copy of our stylesheet with
+    // :hover taken out, on top. The fill must then be filtered, and the handle and its tooltip
+    // stay as they are without our stylesheet, still on top of the fill (hit-tested at its centre).
+    // What a pointer at the handle's centre hits; Spotify's own hit area may cover it, so it's
+    // compared with the result without our stylesheet.
+    const hit = () => {
+      const r = handle.getBoundingClientRect();
+      return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    };
+    const strip = (state) => state.replace(/background-color [^;]*/, ""); // the handle's colour is ours anyway
+    sheet.disabled = true;
+    const without = tooltip();
+    const hitWithout = hit();
+    sheet.disabled = false;
+    // Without any transition (ours would start from the resting value), so it reads the end state.
+    const simulated = Object.assign(document.createElement("style"), { id: "gpb-hover-probe", textContent: `${buildCss(settings, true).replaceAll(":hover", "")}${SCOPE} ${FILL} {
+  transition: none;
+}
+` });
+    document.head.append(simulated);
+    let hovered;
+    try {
+      hovered = { tooltip: tooltip(), filter: getComputedStyle(fill).filter, onTop: hit() === hitWithout };
+    } finally {
+      simulated.remove();
+    }
+    check(HOVER, names[2],
+      !touched.some((sel) => sel !== `${SCOPE} ${HANDLE}`) && !/::?(before|after)/.test(css) && !fill.contains(handle) &&
+        hovered.filter === BRIGHTEN && strip(hovered.tooltip) === strip(without) && hovered.onTop,
+      `${waveformActive() ? "waveform active" : "no waveform"}; simulated hover: fill ${hovered.filter}, pointer at the handle hits the same element ${hovered.onTop}, ` +
+        `tooltip ${strip(hovered.tooltip) === strip(without) ? "unchanged" : `${hovered.tooltip} vs ${without}`}`);
+  }
 }

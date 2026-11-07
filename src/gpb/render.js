@@ -1,5 +1,6 @@
 // Song progress bar only — the volume slider is the same component without this test id.
 
+import { BRIGHTEN, HOVER_TRANSITION, reducedMotion } from "../shared/hover.js";
 import { isInert, settings, stopColour } from "../shared/settings.js";
 
 export const SCOPE = ':is([data-testid="playback-progressbar"], .main-nowPlayingBar-center .playback-bar)';
@@ -44,9 +45,10 @@ const MODE_CSS = {
 
 // Selectors are ≥ 0,2,0 so they beat themes' single-class rules without !important.
 // background-image (not -color) keeps Spotify's hover swap of background-color hidden.
-// Solid output is the same in every mode.
-export function buildCss(s) {
-  if (isInert(s)) return "";
+// Solid output is the same in every mode. Inert colours with a hover effect: only its rules.
+export function buildCss(s, reduced = reducedMotion()) {
+  const hover = hoverCss(s, reduced);
+  if (isInert(s)) return hover.length ? [...hover, ``].join("\n") : "";
   const colours = activeColours(s);
   const handle = colours[colours.length - 1]; // the last stop in every mode (GPB #22 may refine Anchored)
   const spread = s.gradient ? MODE_CSS[s.mode].map((line) => `  ${line}`) : [];
@@ -58,8 +60,22 @@ export function buildCss(s) {
     `${SCOPE} ${HANDLE} {`,
     `  background-color: ${handle};`,
     `}`,
+    ...hover,
     ``,
   ].join("\n");
+}
+
+// The hover effect (#3): Brighten filters the fill while the song bar is hovered, nothing else.
+// Never the handle, whose ::before is playback-bar-waveform's timestamp tooltip. The transition
+// sits on the fill's resting rule so it runs both ways; reduced motion leaves it out.
+export function hoverCss(s, reduced = reducedMotion()) {
+  if (s.hover !== "brighten") return [];
+  return [
+    ...(reduced ? [] : [`${SCOPE} ${FILL} {`, `  transition: ${HOVER_TRANSITION};`, `}`]),
+    `${SCOPE}:hover ${FILL} {`,
+    `  filter: ${BRIGHTEN};`,
+    `}`,
+  ];
 }
 
 export function applyCss() {

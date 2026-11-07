@@ -2,6 +2,7 @@
 
 import { CODE_FORMATS, decodeShareCode } from "../shared/codes.js";
 import { HEX_RE, MAX_STOPS } from "../shared/constants.js";
+import { DEFAULT_HOVER, validHover } from "../shared/hover.js";
 import { SCHEMA_VERSION } from "./config.js";
 
 const KINDS = ["theme", "custom"]; // opaque only, like GPB
@@ -14,7 +15,7 @@ export const DEFAULT_TEXT = "auto";
 // ── Settings ────────────────────────────────────────────────────────────────
 
 export function defaultSettings() {
-  return { version: SCHEMA_VERSION, gradient: false, textColour: DEFAULT_TEXT, stops: [{ id: "s1", kind: "theme" }] };
+  return { version: SCHEMA_VERSION, gradient: false, textColour: DEFAULT_TEXT, hover: DEFAULT_HOVER, stops: [{ id: "s1", kind: "theme" }] };
 }
 
 // One step per schema version: MIGRATIONS[n] turns version-n data into version n + 1. A schema
@@ -43,6 +44,9 @@ export function validateSettings(data) {
   // Settings saved before the text colour option (GCB #11) have none; anything else unknown is invalid.
   const textColour = data.textColour === undefined ? DEFAULT_TEXT : data.textColour;
   if (!TEXT_MODES.includes(textColour)) return null;
+  // The hover effect (#8) likewise: missing means "none".
+  const hover = validHover(data.hover);
+  if (!hover) return null;
 
   const ids = new Set();
   const stops = [];
@@ -54,7 +58,7 @@ export function validateSettings(data) {
     else return null;
   }
   // A gradient needs at least two stops.
-  return { version: SCHEMA_VERSION, gradient: data.gradient && stops.length > 1, textColour, stops };
+  return { version: SCHEMA_VERSION, gradient: data.gradient && stops.length > 1, textColour, hover, stops };
 }
 
 // The share-code formats (shared/codes.js), under the names the self-test uses.

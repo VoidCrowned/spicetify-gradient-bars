@@ -4,6 +4,7 @@
 
 // The Spread row and its radio buttons, and the preview strip: the bar at 100 %.
 
+import { HOVER_ROW_CSS, enableHoverRow, hoverRefs, hoverRowMarkup, renderHoverRow } from "../shared/hover.js";
 import { labelOnLight } from "../shared/colour.js";
 import { modal, openModal } from "../shared/modal.js";
 import { previewing } from "../shared/presets-ui.js";
@@ -11,7 +12,7 @@ import { settings, update } from "../shared/settings.js";
 import { SCOPE, fillImage } from "./render.js";
 import { MODES } from "./settings.js";
 
-export const OPTION_ROW_CSS = `
+export const OPTION_ROW_CSS = HOVER_ROW_CSS + `
 .gpb-spread { display: flex; flex-direction: column; gap: 8px; }
 .gpb-spread-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .gpb-modes { display: flex; gap: 2px; padding: 2px; border-radius: 500px; background-color: rgba(var(--spice-rgb-text), .1); }
@@ -35,7 +36,7 @@ export function optionRowMarkup() {
         </div>
       </div>
       <p class="gpb-spread-hint" id="gpb-spread-hint"></p>
-    </div>`;
+    </div>` + hoverRowMarkup();
 }
 
 export function previewMarkup() {
@@ -44,6 +45,7 @@ export function previewMarkup() {
 
 export function extraRefs(root) {
   return {
+    ...hoverRefs(root), // #3, #8
     spread: root.querySelector(".gpb-spread"),
     modes: root.querySelector(".gpb-modes"),
     modeButtons: [...root.querySelectorAll(".gpb-mode")],
@@ -53,15 +55,18 @@ export function extraRefs(root) {
 
 export function enableOptionRow(m) {
   enableSpread(m);
+  enableHoverRow(m);
 }
 
 export function renderOptionRow() {
   renderSpread();
+  renderHoverRow();
 }
 
 // The theme colour changed while the modal is open: the checked mode's label colour follows it.
 export function onThemeColour() {
   renderSpread();
+  renderHoverRow();
 }
 
 // After applying a preset or a code, and after the self-test restores the settings.

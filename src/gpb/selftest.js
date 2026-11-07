@@ -5,10 +5,11 @@
 import { copyStatus } from "../shared/claim.js";
 import { SELF, entryText, menuItemUsable, menuRegistered, shared } from "../shared/entry.js";
 import { presets } from "../shared/presets.js";
-import { checkDuplicateGuard, checkEntryText, closeOpenModal, copiesDetail, fileName, forwarders, lintCss, loadedCopies, otherFixes, runSelfTest, sameFileCopies, saveTestState, spicetifyVersion } from "../shared/selftest.js";
+import { checkDuplicateGuard, checkEntryText, checkHoverSettings, closeOpenModal, copiesDetail, fileName, forwarders, lintCss, loadedCopies, otherFixes, runSelfTest, sameFileCopies, saveTestState, spicetifyVersion } from "../shared/selftest.js";
+import { BRIGHTEN, DEFAULT_HOVER, HOVER_TRANSITION } from "../shared/hover.js";
 import { setSettings, update } from "../shared/settings.js";
 import { api, sleep, startup } from "../shared/startup.js";
-import { checkEntryIcon, checkSharedEntry, runChecks } from "./checks.js";
+import { checkEntryIcon, checkHoverCss, checkSharedEntry, runChecks } from "./checks.js";
 import { SCHEMA_VERSION, SOURCE, VERSION } from "./config.js";
 import { domProbe } from "./diagnostics.js";
 import { FILL, HANDLE, SCOPE } from "./render.js";
@@ -45,23 +46,35 @@ export function barGeometry(fill) {
   });
 }
 
-export function setTestSettings(gradient, stops, mode = DEFAULT_MODE) {
-  setSettings({ version: SCHEMA_VERSION, gradient, mode, stops: stops.map((s) => ({ ...s })) });
+export function setTestSettings(gradient, stops, mode = DEFAULT_MODE, hover = DEFAULT_HOVER) {
+  setSettings({ version: SCHEMA_VERSION, gradient, mode, hover, stops: stops.map((s) => ({ ...s })) });
   update();
 }
 
 // Declarations our stylesheet must never contain (CLAUDE.md → Hard rules).
 const FORBIDDEN_PROP =
-  /^(-webkit-)?(mask(-.+)?|height|width|transform|clip-path|--progress-bar-.+|--fg-color|--bg-color|--is-active-fg-color)$/;
+  /^(-webkit-)?(mask(-.+)?|height|width|transform|clip-path|filter|transition(-.+)?|--progress-bar-.+|--fg-color|--bg-color|--is-active-fg-color)$/;
+
+// The hover rules (#3): the fill's filter only while the song bar is hovered, and its transition on
+// the fill's resting rule. No pseudo-elements anywhere (the handle's ::before is
+// playback-bar-waveform's timestamp tooltip), and :hover nowhere else.
+export const HOVER_RULE = `${SCOPE}:hover ${FILL}`;
 
 // `mode` is the mode the CSS was built for. The only exception (GPB #15): Anchored's fill rule
 // may set `transform: none` and `clip-path`.
 export function cssProblems(css, mode) {
   return lintCss(css, {
-    rule: (sel) => (sel.startsWith(SCOPE) ? [] : [`unscoped rule: ${sel}`]),
+    rule: (sel) => [
+      ...(sel.startsWith(SCOPE) ? [] : [`unscoped rule: ${sel}`]),
+      ...(sel.includes("::") || /:(before|after)\b/.test(sel) ? [`pseudo-element: ${sel}`] : []),
+      ...(sel.includes(":hover") && sel !== HOVER_RULE ? [`:hover outside the hover rule: ${sel}`] : []),
+    ],
     declaration: (sel, name, value) => {
       const anchoredFill = mode === "anchored" && sel === `${SCOPE} ${FILL}`;
-      const allowed = anchoredFill && ((name === "transform" && value === "none") || name === "clip-path");
+      const allowed =
+        (anchoredFill && ((name === "transform" && value === "none") || name === "clip-path")) ||
+        (sel === HOVER_RULE && name === "filter" && value === BRIGHTEN) ||
+        (sel === `${SCOPE} ${FILL}` && name === "transition" && value === HOVER_TRANSITION);
       return FORBIDDEN_PROP.test(name) && !allowed ? `sets ${name}` : null;
     },
   });
@@ -120,7 +133,7 @@ function environment() {
 }
 
 export function selfTest(options) {
-  return runSelfTest(options, async ({ check }) => {
+  return runSelfTest(options, async ({ check, skip }) => {
     const env = environment();
     check(55, "The environment block reports the Spicetify version", typeof env.spicetify === "string" && !!env.spicetify, env.spicetify);
     const state = saveTestState();
@@ -157,6 +170,8 @@ export function selfTest(options) {
       await checkEntryIcon(check);
       await checkSharedEntry(check);
       await runChecks(check, state.rootStyle, state.restoreButton);
+      checkHoverSettings(check); // #3
+      checkHoverCss(check, skip); // #3
     } catch (e) {
       check(23, "Self-test ran to completion", false, e?.stack || e);
     } finally {

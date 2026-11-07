@@ -17,6 +17,10 @@ export const SCHEMA_VERSION = 2; // 2: no transparency (MIGRATIONS[1])
 // The setting next to gradient and stops: the text colour (GCB #11). Presets and share codes
 // carry it under this key.
 export const EXTRA_KEY = "textColour";
+
+// Hover effects (#8): glow is a blurred copy of the bar's own gradient behind it.
+export const HOVER_MODES = ["none", "brighten", "glow"];
+export const HOVER_ISSUE = "gradient-bars#8"; // the issue tag of the self-test's hover checks
 // Settings saved by a newer version: defaults in memory, the stored value left alone.
 export const KEEP_NEWER_SETTINGS = true;
 // No transparency anywhere: translucent colours count as no colour.

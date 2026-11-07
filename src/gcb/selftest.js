@@ -10,11 +10,13 @@
 
 import { copyStatus } from "../shared/claim.js";
 import { entryText, menuItemUsable, menuRegistered, shared } from "../shared/entry.js";
-import { checkDuplicateGuard, checkEntryText, closeOpenModal, copiesDetail, fileName, forwarders, lintCss, loadedCopies, otherFixes, runSelfTest, sameFileCopies, saveTestState, spicetifyVersion } from "../shared/selftest.js";
+import { checkDuplicateGuard, checkEntryText, checkHoverSettings, closeOpenModal, copiesDetail, fileName, forwarders, lintCss, loadedCopies, otherFixes, runSelfTest, sameFileCopies, saveTestState, spicetifyVersion } from "../shared/selftest.js";
+import { BRIGHTEN, DEFAULT_HOVER, GLOW_BLUR, HOVER_TRANSITION } from "../shared/hover.js";
 import { setSettings, update } from "../shared/settings.js";
 import { sleep, startup } from "../shared/startup.js";
 import { SELECTOR, barBase } from "./bar.js";
-import { checkBarGone, checkEntries, runChecks } from "./checks.js";
+import { HOVER_SELECTORS } from "./render.js";
+import { checkBarGone, checkEntries, checkHoverCss, runChecks } from "./checks.js";
 import { SCHEMA_VERSION, SOURCE, VERSION } from "./config.js";
 import { domProbe, textStatus } from "./diagnostics.js";
 import { DEFAULT_TEXT } from "./settings.js";
@@ -28,14 +30,27 @@ export const HASHED_SAMPLE = ".alQyi9QVSuY6ma3oYVy6";
 export const songchangeCount = () => Spicetify.Player.eventListeners?.songchange?.length ?? 0;
 
 // Applies settings the way the UI does, then recalculates the text colour at once (no debounce).
-export function setTestSettings(gradient, stops, textColour = DEFAULT_TEXT) {
-  setSettings({ version: SCHEMA_VERSION, gradient, textColour, stops: stops.map((s) => ({ ...s })) });
+export function setTestSettings(gradient, stops, textColour = DEFAULT_TEXT, hover = DEFAULT_HOVER) {
+  setSettings({ version: SCHEMA_VERSION, gradient, textColour, hover, stops: stops.map((s) => ({ ...s })) });
   update();
   recalcTextColour();
 }
 
 // Properties our stylesheet may set, all inside the bar's rule.
 const ALLOWED_PROPS = ["background-image", "--text-base", "--essential-base"];
+
+// The hover rules (#8) and what each may set: the transition on the bar's resting rule (exactly
+// HOVER_TRANSITION), Brighten's filter under :hover, and Glow's pseudo-element (unblurred at rest,
+// blurred only under :hover). No other selector, pseudo-element or value.
+const HOVER_PROPS = {
+  [HOVER_SELECTORS.hover]: { filter: BRIGHTEN },
+  [HOVER_SELECTORS.glow]: {
+    content: '""', position: "absolute", inset: "0", "z-index": "-1", "border-radius": "inherit",
+    "background-image": null, filter: "blur(0)", transition: HOVER_TRANSITION, "pointer-events": "none",
+  },
+  [HOVER_SELECTORS.glowHover]: { filter: `blur(${GLOW_BLUR})` },
+};
+const OUR_SELECTORS = [SELECTOR, ...Object.values(HOVER_SELECTORS)];
 
 // A hashed class name: a 16–20 character token with upper- and lower-case letters.
 const HASH_LIKE = /(?<![\w-])[\w-]{16,20}(?![\w-])/g;
@@ -52,13 +67,16 @@ export function cssProblems(css) {
   return lintCss(css, {
     whole: (text) => opacityIn(text).map((found) => `translucent colour ${found}`),
     rule: (sel) => [
-      ...(sel !== SELECTOR ? [`rule not on the Connect bar: ${sel}`] : []),
+      ...(!OUR_SELECTORS.includes(sel) ? [`rule not on the Connect bar: ${sel}`] : []),
       ...hashLike(sel).map((token) => `hash-like class name ${token}`),
     ],
-    declaration: (sel, name) => {
+    declaration: (sel, name, value) => {
       if (!name) return null;
       if (name === "--background-base") return "sets --background-base";
-      return ALLOWED_PROPS.includes(name) ? null : `sets ${name}`;
+      if (sel === SELECTOR) return ALLOWED_PROPS.includes(name) || (name === "transition" && value === HOVER_TRANSITION) ? null : `sets ${name}`;
+      const allowed = HOVER_PROPS[sel] ?? {};
+      if (!(name in allowed)) return `sets ${name} in ${sel}`;
+      return allowed[name] === null || allowed[name] === value ? null : `sets ${name}: ${value} in ${sel}`;
     },
   });
 }
@@ -71,9 +89,13 @@ export function parseProblems(css) {
   const written = [...css.matchAll(/\{([^}]*)\}/g)].map(([, body]) => body.split(";").filter((d) => d.trim()).length);
   const problems = [];
   if (rules.length !== written.length) problems.push(`${rules.length} of ${written.length} rules parsed`);
+  const names = [...css.matchAll(/\{([^}]*)\}/g)].map(([, body]) => body.split(";").map((d) => d.split(":")[0].trim()).filter(Boolean));
   rules.forEach((rule, i) => {
-    if (rule.style?.length !== written[i]) problems.push(`rule ${i + 1}: ${rule.style?.length} of ${written[i]} declarations parsed`);
-    if (rule.selectorText?.replace(/\s+/g, " ") !== SELECTOR) problems.push(`rule ${i + 1}: selector parsed as ${rule.selectorText}`);
+    // Shorthands (inset, transition, border-radius) parse into several longhands: each written
+    // declaration must read back, rather than the counts matching.
+    const lost = (names[i] ?? []).filter((name) => !rule.style?.getPropertyValue(name));
+    if (lost.length || (rule.style?.length ?? 0) < written[i]) problems.push(`rule ${i + 1}: ${lost.join(", ") || `${rule.style?.length} of ${written[i]}`} not parsed`);
+    if (!OUR_SELECTORS.includes(rule.selectorText?.replace(/\s+/g, " "))) problems.push(`rule ${i + 1}: selector parsed as ${rule.selectorText}`);
   });
   return problems;
 }
@@ -153,6 +175,8 @@ export function selfTest(options) {
       checkBarGone(check); // #14
       await checkEntries(check, skip);
       await runChecks(check, skip, state.rootStyle, state.restoreButton);
+      checkHoverSettings(check); // #8
+      checkHoverCss(check, skip); // #8
     } catch (e) {
       check(9, "Self-test ran to completion", false, e?.stack || e);
     } finally {

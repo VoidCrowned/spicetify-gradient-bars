@@ -10,7 +10,8 @@ import { pickerHsv } from "../shared/picker.js";
 import { APPLY_LABEL, COPIED_LABEL, COPIED_MS, EXPORT_LABEL, EXPORT_TITLE, IMPORT_ERROR, PREVIEW_CODE_MESSAGE, SAVE_FULL_LABEL, chipEl, copyCode, pendingUndo, renderChips } from "../shared/presets-ui.js";
 import { BUILT_IN_PRESETS, addPreset, deletePreset, loadPresets, matchesPreset, presetSettings, presets, renamePreset, sameSettings, savePresets, setPresets, uniqueName, updatePreset } from "../shared/presets.js";
 import { RESET_CONFIRM_LABEL, RESET_CONFIRM_MS } from "../shared/reset.js";
-import { BLUE, GREEN, PROBE, RED, computedHex, custom, styleText, theme, tick, waitFor, withoutTransitions } from "../shared/selftest.js";
+import { BRIGHTEN, GLOW_BLUR } from "../shared/hover.js";
+import { BLUE, GREEN, PROBE, RED, checkHoverRow, computedHex, custom, styleText, theme, tick, waitFor, withoutTransitions } from "../shared/selftest.js";
 import { presetsKey, settingsKey } from "../shared/keys.js";
 import { createResults, summarise } from "../shared/report.js";
 import { loadSettings, setSettings, settings, update } from "../shared/settings.js";
@@ -20,7 +21,7 @@ import { findStop, selectedId, setStopColour } from "../shared/stops.js";
 import { BAR_ICON, BAR_LINK, PARENT, SELECTOR, UNSCOPED, barBase, findBar } from "./bar.js";
 import { ENTRY_LABEL, GPB_STORAGE_KEY, HELP_LINES, IMPORT_TITLE, PRESETS_KEY, SCHEMA_VERSION, STORAGE_KEY, TITLE } from "./config.js";
 import { statusReport } from "./diagnostics.js";
-import { barImage, buildCss } from "./render.js";
+import { HOVER_SELECTORS, barImage, buildCss } from "./render.js";
 import { HASHED_SAMPLE, barGeometry, barWithAndWithout, computedImage, cssProblems, hashLike, opacityIn, parseProblems, setTestSettings, songchangeCount } from "./selftest.js";
 import { DEFAULT_TEXT, GPB_CODE_PREFIX, MIGRATIONS, TEXT_MODES, decodeCode, defaultSettings } from "./settings.js";
 import { BLACK, SAMPLES_BETWEEN, TEXT_DELAY, WHITE, appliedTextColour, asideObserver, gradientSamples, onThemeChange, pickTextColour, recalcTextColour, setTextRegion, textContext, textRegion, textResult, textRuns, watchedAside } from "./text-colour.js";
@@ -918,7 +919,7 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
     settings.textColour === mode && m.textButtons.every((b, i) => b === textRowNodes[i] && b.isConnected &&
       (b.getAttribute("aria-checked") === "true") === (b.dataset.mode === mode) && b.tabIndex === (b.dataset.mode === mode ? 0 : -1));
   check(11, "Text colour row between the Gradient row and the Presets row: a radiogroup of Auto, Black, White, Spotify default; no <select>",
-    m.gradientRow.nextElementSibling === m.text && m.text.nextElementSibling === m.presets && m.textModes.getAttribute("role") === "radiogroup" &&
+    m.gradientRow.nextElementSibling === m.text && m.text.nextElementSibling === m.hover && m.hover.nextElementSibling === m.presets && m.textModes.getAttribute("role") === "radiogroup" &&
       m.textModes.getAttribute("aria-labelledby") === "gcb-text-label" &&
       m.textButtons.map((b) => b.textContent).join() === "Auto,Black,White,Spotify default" &&
       m.textButtons.every((b) => b.tagName === "BUTTON" && b.getAttribute("role") === "radio") && !m.root.querySelector("select") &&
@@ -939,9 +940,9 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
       window.__gcb.status();
       const extra = [...m.text.children].filter((el) => el !== m.textLabel && el !== m.textModes);
       const hintLike = m.root.querySelector(".gcb-text-hint, .gcb-warning") ?? m.text.querySelector('[id$="-hint"], [aria-describedby]') ??
-        (m.text.nextElementSibling === m.presets ? null : m.text.nextElementSibling);
+        (m.text.nextElementSibling === m.hover ? null : m.text.nextElementSibling); // the Hover row (#8) follows
       const words = /\d(\.\d)?:1\b|4\.5|contrast|readab|warning/i.exec(m.text.textContent);
-      const gap = m.presets.getBoundingClientRect().top - m.text.getBoundingClientRect().bottom;
+      const gap = m.hover.getBoundingClientRect().top - m.text.getBoundingClientRect().bottom;
       const rowGap = parseFloat(getComputedStyle(m.root).rowGap);
       if (!textShows(mode) || extra.length || hintLike || words || Math.abs(gap - rowGap) > 0.5)
         hintProblems.push(`${mode}: ${extra.length} extra element(s), ${hintLike ? `.${hintLike.className}` : "no hint element"}, ` +
@@ -979,6 +980,8 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
   check(11, "Keyboard: Home, →, End and → (wrapping) change the text colour and move focus; Alt+→ doesn't",
     !textKeys.some((step) => step.includes("expected")), textKeys.join(", "));
   stillOpen("changing the text colour");
+  await checkHoverRow(check, m, { realClick, press, saveDelay: SAVE_DELAY }); // #8
+  stillOpen("changing the hover effect");
   realClick(m.textButtons[1]);
   await sleep(SAVE_DELAY + 100);
   const storedText = JSON.parse(Spicetify.LocalStorage.get(settingsKey()) ?? "{}").textColour;
@@ -1160,7 +1163,7 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
   const labelRect0 = m.presetsRow.querySelector(".gcb-label").getBoundingClientRect();
   const unreachableChips = [...m.chips.querySelectorAll(".gcb-chip"), m.exportButton, m.importButton].filter((el) => !reachable(el));
   check(29, "Presets row between the Text colour row and the preview: label left, Export and Import right, every chip reachable",
-    m.presets.previousElementSibling === m.text && m.presets.nextElementSibling === m.preview &&
+    m.presets.previousElementSibling === m.hover && m.hover.previousElementSibling === m.text && m.presets.nextElementSibling === m.preview && // Hover (#8) under Text colour
       Math.abs(labelRect0.left - presetsRect.left) <= 1 && Math.abs(toolsRect.right - presetsRect.right) <= 1 && !unreachableChips.length,
     `after .${m.presets.previousElementSibling?.className}, before .${m.presets.nextElementSibling?.className}` +
       (unreachableChips.length ? `; not reachable: ${unreachableChips.map((el) => el.textContent).join(", ")}` : ""));
@@ -1515,7 +1518,7 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
   check(2, "Storage key is our own (gcb:…), never Gradient Progress Bar's", STORAGE_KEY !== GPB_STORAGE_KEY && STORAGE_KEY.startsWith("gcb:"),
     `${STORAGE_KEY} vs GPB's ${GPB_STORAGE_KEY}`);
   check(2, "Defaults: one theme stop, gradient off, text colour Auto",
-    JSON.stringify(defaultSettings()) === JSON.stringify({ version: 2, gradient: false, textColour: "auto", stops: [{ id: "s1", kind: "theme" }] }),
+    JSON.stringify(defaultSettings()) === JSON.stringify({ version: 2, gradient: false, textColour: "auto", hover: "none", stops: [{ id: "s1", kind: "theme" }] }),
     JSON.stringify(defaultSettings()));
   const invalid = {
     "corrupt JSON": "{broken",
@@ -1574,4 +1577,91 @@ export async function runChecks(check, skip, rootStyle, restoreButton) {
   const reloaded = loadSettings();
   check(2, "Saves are debounced, then a load returns identical settings (round-trip, theme and custom stops, the text colour)",
     !writtenAtOnce && JSON.stringify(reloaded) === JSON.stringify(settings), `written at once ${writtenAtOnce}, ${JSON.stringify(reloaded)}`);
+}
+
+// ── Hover effect (#8): CSS, and the live bar ──
+const HOVER = "gradient-bars#8";
+
+export function checkHoverCss(check, skip) {
+  const stops = [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)];
+  const with_ = (hover, extra = {}) => ({ version: SCHEMA_VERSION, gradient: true, textColour: DEFAULT_TEXT, hover, stops, ...extra });
+  const samples = [
+    ["brighten", with_("brighten")],
+    ["glow", with_("glow")],
+    ["glow, solid", with_("glow", { gradient: false, stops: [custom("s1", RED)] })],
+    ["glow, inert theme colour", { ...defaultSettings(), hover: "glow" }],
+    ["brighten, inert theme colour", { ...defaultSettings(), hover: "brighten" }],
+  ];
+  const problems = samples.flatMap(([label, s]) => [false, true].flatMap((reduced) => {
+    const css = buildCss(s, WHITE, reduced);
+    return [...cssProblems(css), ...parseProblems(css)].map((p) => `${label}${reduced ? " (reduced motion)" : ""}: ${p}`);
+  }));
+  check(HOVER, "Brighten and Glow pass the CSS lint and the browser's parser (gradient, solid, inert; with and without reduced motion)",
+    !problems.length, problems.join("; ") || `${samples.length * 2} stylesheets`);
+  const rules = (css) => [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].map(([, sel, body]) => [sel.trim(), body]);
+  const glowCss = buildCss(samples[1][1], null, false);
+  const brightCss = buildCss(samples[0][1], null, false);
+  const filtered = [...rules(glowCss), ...rules(brightCss)].filter(([, body]) => /filter: (?!blur\(0\))/.test(body)).map(([sel]) => sel);
+  const reduced = buildCss(samples[1][1], null, true);
+  check(HOVER, "The effect applies only under :hover (Glow rests unblurred behind the bar); reduced motion drops the transition, not the effect",
+    filtered.length === 2 && filtered.every((sel) => sel.includes(":hover")) && glowCss.includes(`${HOVER_SELECTORS.glow} {`) &&
+      glowCss.includes("filter: blur(0);") && !reduced.includes("transition") && reduced.includes(`filter: blur(${GLOW_BLUR});`) &&
+      !/:hover|::before|filter|transition/.test(buildCss({ ...samples[1][1], hover: "none" }, null, false)),
+    `filtered under: ${filtered.join(", ")}`);
+  const solid = buildCss(samples[2][1], null, false);
+  const inert = buildCss(samples[3][1], null, false);
+  check(HOVER, "Glow is a copy of the bar's own gradient; one colour glows in that colour, an inert bar in its own --background-base",
+    glowCss.includes(`background-image: ${barImage(samples[1][1])};`) && solid.includes(`background-image: linear-gradient(to right, ${RED}, ${RED});`) &&
+      inert.includes("background-image: linear-gradient(var(--background-base), var(--background-base));") && !inert.includes(`${SELECTOR} {\n  background-image`),
+    inert.replace(/\s+/g, " ").slice(0, 160));
+  const flags = {
+    "filter on the bar at rest": cssProblems(`${SELECTOR} {\n  filter: ${BRIGHTEN};\n}\n`),
+    "a blurred glow at rest": cssProblems(`${HOVER_SELECTORS.glow} {\n  filter: blur(${GLOW_BLUR});\n}\n`),
+    "::after": cssProblems(`${SELECTOR}::after {\n  content: "";\n}\n`),
+    "another transition": cssProblems(`${SELECTOR} {\n  transition: all 1s;\n}\n`),
+    "background-color on the glow": cssProblems(`${HOVER_SELECTORS.glow} {\n  background-color: red;\n}\n`),
+  };
+  const missed = Object.entries(flags).filter(([, found]) => !found.length).map(([label]) => label);
+  check(HOVER, "The CSS lint flags a filter at rest, a blurred glow at rest, other pseudo-elements, other transitions and other glow properties",
+    !missed.length, missed.length ? `not flagged: ${missed.join(", ")}` : Object.values(flags).map((p) => p.join("/")).join("; "));
+
+  const bar = findBar();
+  const names = [
+    "Live bar with Glow: the pseudo-element sits behind the bar (z-index -1, anchored to it), unblurred at rest, blurred on hover with the text still on top",
+    "Live bar with Glow or Brighten: background, size, radius and inline style untouched at rest",
+  ];
+  if (!bar) return names.forEach((name) => skip(HOVER, name));
+  const geometryBefore = barWithAndWithout(bar, barGeometry);
+  setTestSettings(true, stops, DEFAULT_TEXT, "glow");
+  const glow = getComputedStyle(bar, "::before");
+  const restState = `content ${glow.content}, z-index ${glow.zIndex}, filter ${glow.filter}, position ${glow.position}; bar position ${getComputedStyle(bar).position}`;
+  const restOk = glow.content === '""' && glow.zIndex === "-1" && (bar.matches(":hover") || glow.filter === "blur(0px)") &&
+    glow.position === "absolute" && getComputedStyle(bar).position !== "static";
+  // Page code can't hover the bar: a copy of our stylesheet with :hover taken out simulates it.
+  // The glow is then blurred, and the text still sits on top (hit-tested at its centre).
+  // Without any transition (ours would start from the resting value), so it reads the end state.
+  const simulated = Object.assign(document.createElement("style"), { id: "gcb-hover-probe", textContent: `${buildCss(settings, appliedTextColour(), true).replaceAll(":hover", "")}${HOVER_SELECTORS.glow} {
+  transition: none;
+}
+` });
+  document.head.append(simulated);
+  let hovered;
+  try {
+    const span = bar.querySelector(BAR_LINK)?.querySelector("span");
+    const r = span?.getBoundingClientRect();
+    hovered = { filter: getComputedStyle(bar, "::before").filter, textOnTop: !!r && span.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)) };
+  } finally {
+    simulated.remove();
+  }
+  const glowState = `${restState}; simulated hover: glow ${hovered.filter}, text on top ${hovered.textOnTop}`;
+  const ok = restOk && hovered.filter === `blur(${GLOW_BLUR})` && hovered.textOnTop;
+  const glowGeometry = barWithAndWithout(bar, barGeometry);
+  setTestSettings(true, stops, DEFAULT_TEXT, "brighten");
+  const brightRest = bar.matches(":hover") || getComputedStyle(bar).filter === "none";
+  const brightGeometry = barWithAndWithout(bar, barGeometry);
+  if (!document.contains(bar) || findBar() !== bar) return names.forEach((name) => skip(HOVER, name, BAR_GONE));
+  check(HOVER, names[0], ok, glowState);
+  check(HOVER, names[1], glowGeometry.ours === glowGeometry.spotify && brightGeometry.ours === brightGeometry.spotify && brightRest &&
+    geometryBefore.spotify === glowGeometry.spotify && !bar.getAttribute("style"),
+    `glow ${glowGeometry.ours === glowGeometry.spotify ? "same" : `${glowGeometry.ours} vs ${glowGeometry.spotify}`}; brighten at rest filter ${getComputedStyle(bar).filter}`);
 }

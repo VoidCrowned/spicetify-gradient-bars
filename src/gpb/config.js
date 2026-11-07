@@ -16,6 +16,12 @@ export const SCHEMA_VERSION = 1;
 // The setting next to gradient and stops: the Spread mode (GPB #15). Presets and share codes
 // carry it under this key.
 export const EXTRA_KEY = "mode";
+
+// Hover effects (#3). No glow on the song bar: under playback-bar-waveform it would be a blurred
+// rectangle around the waveform (its mask is on Spotify's slider areas), and Anchored and Slide
+// would cut it hard at the playhead or the bar's start.
+export const HOVER_MODES = ["none", "brighten"];
+export const HOVER_ISSUE = "gradient-bars#3"; // the issue tag of the self-test's hover checks
 // Settings saved by a newer version count as invalid and are reset (GCB keeps them instead).
 export const KEEP_NEWER_SETTINGS = false;
 // GPB's colour helpers accept translucent colours and drop the alpha.

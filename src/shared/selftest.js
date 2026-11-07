@@ -6,16 +6,18 @@
 //   - it logs and copies only the summary line and one line per failed check;
 //   - selfTest({ full: true }) copies the full report as JSON instead.
 
-import { FILE, P, PRESETS_KEY, SOURCE, STORAGE_KEY } from "ext:config";
-import { applyCss, settingsReplaced } from "ext:hooks";
+import { FILE, HOVER_ISSUE, HOVER_MODES, P, PRESETS_KEY, SOURCE, STORAGE_KEY } from "ext:config";
+import { applyCss, defaultSettings, settingsReplaced, validateSettings } from "ext:hooks";
+import { decodeShareCode, encodeCode } from "./codes.js";
 import { claimBar, copyStatus } from "./claim.js";
 import { toHex } from "./colour.js";
 import { entryText, menuItemUsable, menuRegistered } from "./entry.js";
-import { TEST_KEYS, useTestKeys } from "./keys.js";
+import { HOVER_LABELS } from "./hover.js";
+import { TEST_KEYS, settingsKey, useTestKeys } from "./keys.js";
 import { closeModal, modal } from "./modal.js";
-import { presets, setPresets } from "./presets.js";
+import { BUILT_IN_PRESETS, loadPresets, presetSettings, presets, setPresets } from "./presets.js";
 import { createResults, printReport, reportLines, summarise } from "./report.js";
-import { cancelSave, flushSettings, setSettings, settings } from "./settings.js";
+import { cancelSave, flushSettings, loadSettings, setSettings, settings } from "./settings.js";
 import { sleep } from "./startup.js";
 
 export const RED = "#ff0000";
@@ -84,6 +86,88 @@ export function copiesDetail(copies) {
 
 // The duplicate guard (claim.js, #15), tried on its own registry and globals; the live ones are
 // never touched. Copies are described as claimBar() sees them: file, source URL, forwarder mark.
+// ── Hover effect (#3, #8): storage, presets and share codes ──
+export function checkHoverSettings(check) {
+  const base = { ...defaultSettings(), gradient: true, stops: [custom("s1", RED), custom("s2", BLUE)] };
+  const legacy = { ...base };
+  delete legacy.hover;
+  const warnings = [];
+  const warn = console.warn;
+  console.warn = (...args) => warnings.push(args.join(" "));
+  let loaded;
+  try {
+    loaded = loadSettings(JSON.stringify(legacy));
+  } finally {
+    console.warn = warn;
+  }
+  check(HOVER_ISSUE, 'Stored settings without "hover" (from before this option) load as "none", no warning',
+    loaded.hover === "none" && loaded.stops.length === 2 && !warnings.length, `${loaded.hover}, ${warnings.length} warning(s)`);
+  const trips = HOVER_MODES.map((hover) => [hover, validateSettings(JSON.parse(JSON.stringify({ ...base, hover })))?.hover]);
+  const others = ["sparkle", "", null, 1, "glow"].filter((value) => !HOVER_MODES.includes(value));
+  const accepted = others.filter((value) => validateSettings({ ...base, hover: value }) !== null);
+  check(HOVER_ISSUE, `Every hover option (${HOVER_MODES.join(", ")}) round-trips through storage; anything else is invalid settings`,
+    trips.every(([hover, back]) => hover === back) && !accepted.length,
+    `${trips.map(([hover, back]) => `${hover} → ${back}`).join(", ")}; ${accepted.length} of ${others.length} other values accepted`);
+  const current = { ...base, hover: HOVER_MODES[HOVER_MODES.length - 1] };
+  const { version, hover, ...saved } = structuredClone(base);
+  const own = presetSettings({ id: "p1", name: "Mine", settings: saved }, current);
+  const builtIn = presetSettings(BUILT_IN_PRESETS[0], current);
+  const stored = loadPresets(JSON.stringify({ version: 1, presets: [{ id: "p1", name: "Mine", settings: { ...saved, hover: "brighten" } }] }));
+  check(HOVER_ISSUE, "Presets don't store the hover effect; applying a built-in or an own preset keeps the current one",
+    builtIn.hover === current.hover && own.hover === current.hover && stored.length === 1 && !("hover" in stored[0].settings),
+    `built-in → ${builtIn.hover}, own → ${own.hover}, stored keys ${stored[0] ? Object.keys(stored[0].settings).join(",") : "none"} (current ${current.hover})`);
+  const code = encodeCode(current);
+  const body = atob(code.slice(code.indexOf(":") + 1).replace(/-/g, "+").replace(/_/g, "/"));
+  const decoded = decodeShareCode(code, current)?.settings;
+  const intoNone = decodeShareCode(code, { ...current, hover: "none" })?.settings;
+  check(HOVER_ISSUE, "Share codes don't carry the hover effect (format unchanged); importing one keeps the current hover effect",
+    code === encodeCode({ ...current, hover: "none" }) && !/hover|"h"/.test(body) && decoded?.hover === current.hover && intoNone?.hover === "none",
+    `${code}; imported with ${current.hover} → ${decoded?.hover}, with none → ${intoNone?.hover}`);
+}
+
+// ── Hover row (#3, #8): mouse and keyboard, built once and updated in place ──
+export async function checkHoverRow(check, m, { realClick, press, saveDelay }) {
+  const nodes = [...m.hoverButtons];
+  const shows = (hover) =>
+    settings.hover === hover && m.hoverButtons.every((b, i) => b === nodes[i] && b.isConnected &&
+      (b.getAttribute("aria-checked") === "true") === (b.dataset.hover === hover) && b.tabIndex === (b.dataset.hover === hover ? 0 : -1));
+  const state = () =>
+    `hover ${settings.hover}, checked ${m.hoverButtons.filter((b) => b.getAttribute("aria-checked") === "true").map((b) => b.dataset.hover).join() || "none"}, ` +
+    `tabindex ${m.hoverButtons.map((b) => b.tabIndex).join()}, focus ${document.activeElement?.dataset?.hover ?? document.activeElement?.className}`;
+  const style = () => document.getElementById(`${P}-style`)?.textContent ?? "";
+  check(HOVER_ISSUE, `Hover row: a radiogroup of ${HOVER_MODES.map((h) => HOVER_LABELS[h]).join(", ")}, labelled "Hover"; plain buttons, no <select>`,
+    m.hoverOptions.getAttribute("role") === "radiogroup" && m.hoverOptions.getAttribute("aria-labelledby") === `${P}-hover-label` &&
+      m.root.querySelector(`#${P}-hover-label`)?.textContent === "Hover" &&
+      m.hoverButtons.map((b) => b.textContent).join() === HOVER_MODES.map((h) => HOVER_LABELS[h]).join() &&
+      m.hoverButtons.every((b) => b.tagName === "BUTTON" && b.getAttribute("role") === "radio") && !m.hover.querySelector("select"),
+    state());
+  const clicks = [];
+  for (const hover of [...HOVER_MODES.slice(1), HOVER_MODES[0]]) {
+    realClick(m.hoverButtons[HOVER_MODES.indexOf(hover)]);
+    const live = hover === "none" ? !style().includes(":hover") : style().includes(":hover");
+    clicks.push(`${hover}${shows(hover) && live ? "" : ` (expected ${hover}, stylesheet ${live ? "ok" : "wrong"})`}`);
+  }
+  check(HOVER_ISSUE, "Clicking each hover option applies it at once (:hover rules only when it isn't None), the row updated in place",
+    !clicks.some((c) => c.includes("expected")), clicks.join(", "));
+  m.hoverButtons[0].focus();
+  const last = HOVER_MODES.length - 1;
+  const keys = [];
+  for (const [key, index] of [["ArrowRight", 1], ["End", last], ["Home", 0], ["ArrowLeft", last], ["ArrowRight", 0]]) {
+    press(document.activeElement, key);
+    const want = HOVER_MODES[index];
+    keys.push(`${key} → ${settings.hover}${shows(want) && document.activeElement === m.hoverButtons[index] ? "" : ` (expected ${want} focused)`}`);
+  }
+  const altKept = press(document.activeElement, "ArrowRight", { altKey: true });
+  keys.push(`Alt+→ → ${settings.hover}${settings.hover === HOVER_MODES[0] && altKept ? "" : " (expected no change)"}`);
+  check(HOVER_ISSUE, "Hover keyboard: →, End, Home and ← (wrapping) change the option and move focus; Alt+→ doesn't",
+    !keys.some((k) => k.includes("expected")), keys.join(", "));
+  realClick(m.hoverButtons[last]);
+  await sleep(saveDelay + 100);
+  const stored = JSON.parse(Spicetify.LocalStorage.get(settingsKey()) ?? "{}").hover;
+  realClick(m.hoverButtons[0]);
+  check(HOVER_ISSUE, "The chosen hover option is saved", stored === HOVER_MODES[last], `stored ${stored}`);
+}
+
 // #6: the entry text says "hidden" exactly when Spicetify's MenuItem is broken, read when it's
 // read, not when the entry was registered.
 export function checkEntryText(check) {

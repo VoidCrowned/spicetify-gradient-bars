@@ -20,6 +20,8 @@
   var PRESETS_KEY = "gpb:presets";
   var SCHEMA_VERSION = 1;
   var EXTRA_KEY = "mode";
+  var HOVER_MODES = ["none", "brighten"];
+  var HOVER_ISSUE = "gradient-bars#3";
   var KEEP_NEWER_SETTINGS = false;
   var OPAQUE_ONLY = false;
   var ENTRY_LABEL = NAME;
@@ -73,96 +75,6 @@
       activeSource: entry?.active?.source ?? null,
       skipped: entry?.skipped.map((c) => `${c.copy}${c.version ? ` ${c.version}` : ""}${c.from ? ` (${c.from})` : ""}`) ?? []
     };
-  }
-
-  // src/shared/constants.js
-  var MAX_STOPS = 8;
-  var SAVE_DELAY = 250;
-  var HEX_RE = /^#[0-9a-f]{6}$/i;
-  var THEME_COLOUR = "var(--spice-button, var(--spice-text, #1db954))";
-  var PRESETS_VERSION = 1;
-  var MAX_PRESETS = 12;
-  var PRESET_NAME_MAX = 24;
-
-  // src/shared/keys.js
-  var TEST_KEYS = { settings: `${P}:selftest:settings`, presets: `${P}:selftest:presets` };
-  var testKeys = false;
-  var settingsKey = () => testKeys ? TEST_KEYS.settings : STORAGE_KEY;
-  var presetsKey = () => testKeys ? TEST_KEYS.presets : PRESETS_KEY;
-  function removeTestKeys() {
-    Spicetify.LocalStorage.remove(TEST_KEYS.settings);
-    Spicetify.LocalStorage.remove(TEST_KEYS.presets);
-  }
-  function useTestKeys(on) {
-    if (on) {
-      for (const [real, test] of [[STORAGE_KEY, TEST_KEYS.settings], [PRESETS_KEY, TEST_KEYS.presets]]) {
-        const value = Spicetify.LocalStorage.get(real);
-        if (value == null) Spicetify.LocalStorage.remove(test);
-        else Spicetify.LocalStorage.set(test, value);
-      }
-    }
-    testKeys = on;
-    if (!on) removeTestKeys();
-  }
-
-  // src/shared/clipboard.js
-  var CLIPBOARD_TIMEOUT_MS = 1500;
-  var copyContainer = () => document.body;
-  function setCopyContainer(container) {
-    copyContainer = container;
-  }
-  var clipboardSources = {
-    // where the tiers come from; the self-test swaps these for stubs
-    api: () => window.Spicetify?.Platform?.ClipboardAPI,
-    clipboard: () => navigator.clipboard,
-    execCommand: (command) => document.execCommand(command)
-  };
-  async function writeClipboard(text) {
-    const settle = (promise) => Promise.race([
-      promise,
-      new Promise((_, reject) => setTimeout(() => reject(new Error("clipboard timeout")), CLIPBOARD_TIMEOUT_MS))
-    ]);
-    const asyncTiers = [
-      ["ClipboardAPI", () => {
-        const clipboardApi = clipboardSources.api();
-        if (typeof clipboardApi?.copy !== "function") throw new Error("no ClipboardAPI");
-        return clipboardApi.copy(text);
-      }],
-      ["writeText", () => {
-        const clipboard = clipboardSources.clipboard();
-        if (typeof clipboard?.writeText !== "function") throw new Error("no clipboard");
-        return clipboard.writeText(text);
-      }]
-    ];
-    for (const [name, write] of asyncTiers) {
-      try {
-        await settle(Promise.resolve().then(write));
-        return name;
-      } catch {
-      }
-    }
-    return execCommandCopy(text) ? "execCommand" : null;
-  }
-  function execCommandCopy(text) {
-    const buffer = document.createElement("textarea");
-    buffer.className = `${P}-copy-buffer`;
-    buffer.value = text;
-    buffer.readOnly = true;
-    buffer.tabIndex = -1;
-    buffer.setAttribute("aria-hidden", "true");
-    Object.assign(buffer.style, { position: "fixed", top: "0", left: "0", width: "1px", height: "1px", padding: "0", border: "0", opacity: "0", pointerEvents: "none" });
-    const focused = document.activeElement;
-    copyContainer().append(buffer);
-    buffer.focus({ preventScroll: true });
-    buffer.select();
-    let copied = false;
-    try {
-      copied = clipboardSources.execCommand("copy") === true;
-    } catch {
-    }
-    buffer.remove();
-    if (focused?.isConnected && focused !== document.body) focused.focus({ preventScroll: true });
-    return copied;
   }
 
   // src/shared/colour.js
@@ -237,6 +149,248 @@
     return (hi + 0.05) / (lo + 0.05);
   }
 
+  // src/shared/clipboard.js
+  var CLIPBOARD_TIMEOUT_MS = 1500;
+  var copyContainer = () => document.body;
+  function setCopyContainer(container) {
+    copyContainer = container;
+  }
+  var clipboardSources = {
+    // where the tiers come from; the self-test swaps these for stubs
+    api: () => window.Spicetify?.Platform?.ClipboardAPI,
+    clipboard: () => navigator.clipboard,
+    execCommand: (command) => document.execCommand(command)
+  };
+  async function writeClipboard(text) {
+    const settle = (promise) => Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("clipboard timeout")), CLIPBOARD_TIMEOUT_MS))
+    ]);
+    const asyncTiers = [
+      ["ClipboardAPI", () => {
+        const clipboardApi = clipboardSources.api();
+        if (typeof clipboardApi?.copy !== "function") throw new Error("no ClipboardAPI");
+        return clipboardApi.copy(text);
+      }],
+      ["writeText", () => {
+        const clipboard = clipboardSources.clipboard();
+        if (typeof clipboard?.writeText !== "function") throw new Error("no clipboard");
+        return clipboard.writeText(text);
+      }]
+    ];
+    for (const [name, write] of asyncTiers) {
+      try {
+        await settle(Promise.resolve().then(write));
+        return name;
+      } catch {
+      }
+    }
+    return execCommandCopy(text) ? "execCommand" : null;
+  }
+  function execCommandCopy(text) {
+    const buffer = document.createElement("textarea");
+    buffer.className = `${P}-copy-buffer`;
+    buffer.value = text;
+    buffer.readOnly = true;
+    buffer.tabIndex = -1;
+    buffer.setAttribute("aria-hidden", "true");
+    Object.assign(buffer.style, { position: "fixed", top: "0", left: "0", width: "1px", height: "1px", padding: "0", border: "0", opacity: "0", pointerEvents: "none" });
+    const focused = document.activeElement;
+    copyContainer().append(buffer);
+    buffer.focus({ preventScroll: true });
+    buffer.select();
+    let copied = false;
+    try {
+      copied = clipboardSources.execCommand("copy") === true;
+    } catch {
+    }
+    buffer.remove();
+    if (focused?.isConnected && focused !== document.body) focused.focus({ preventScroll: true });
+    return copied;
+  }
+
+  // src/shared/constants.js
+  var MAX_STOPS = 8;
+  var SAVE_DELAY = 250;
+  var HEX_RE = /^#[0-9a-f]{6}$/i;
+  var THEME_COLOUR = "var(--spice-button, var(--spice-text, #1db954))";
+  var PRESETS_VERSION = 1;
+  var MAX_PRESETS = 12;
+  var PRESET_NAME_MAX = 24;
+
+  // src/shared/keys.js
+  var TEST_KEYS = { settings: `${P}:selftest:settings`, presets: `${P}:selftest:presets` };
+  var testKeys = false;
+  var settingsKey = () => testKeys ? TEST_KEYS.settings : STORAGE_KEY;
+  var presetsKey = () => testKeys ? TEST_KEYS.presets : PRESETS_KEY;
+  function removeTestKeys() {
+    Spicetify.LocalStorage.remove(TEST_KEYS.settings);
+    Spicetify.LocalStorage.remove(TEST_KEYS.presets);
+  }
+  function useTestKeys(on) {
+    if (on) {
+      for (const [real, test] of [[STORAGE_KEY, TEST_KEYS.settings], [PRESETS_KEY, TEST_KEYS.presets]]) {
+        const value = Spicetify.LocalStorage.get(real);
+        if (value == null) Spicetify.LocalStorage.remove(test);
+        else Spicetify.LocalStorage.set(test, value);
+      }
+    }
+    testKeys = on;
+    if (!on) removeTestKeys();
+  }
+
+  // src/shared/codes.js
+  var CODE_FORMATS = {
+    gpb: { prefix: "gpb1:", field: "m", key: "mode", codes: { compress: "c", anchored: "a", slide: "s" } },
+    gcb: { prefix: "gcb1:", field: "x", key: "textColour", codes: { auto: "a", black: "b", white: "w", default: "d" } }
+  };
+  var OWN_FORMAT = CODE_FORMATS[P];
+  var CODE_PREFIX = OWN_FORMAT.prefix;
+  var toBase64Url = (data) => btoa(JSON.stringify(data)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  function encodeCode(s) {
+    return CODE_PREFIX + toBase64Url({
+      g: s.gradient ? 1 : 0,
+      [OWN_FORMAT.field]: OWN_FORMAT.codes[s[EXTRA_KEY]],
+      s: s.stops.map((stop) => stop.kind === "theme" ? "t" : stop.color.slice(1))
+    });
+  }
+  function decodeShareCode(text, current = settings) {
+    const code = String(text ?? "").trim();
+    const from = Object.keys(CODE_FORMATS).find((id) => code.startsWith(CODE_FORMATS[id].prefix));
+    const format = CODE_FORMATS[from];
+    const body = format ? code.slice(format.prefix.length) : "";
+    if (!format || !/^[A-Za-z0-9_-]+$/.test(body)) return null;
+    let data = null;
+    try {
+      data = JSON.parse(atob(body.replace(/-/g, "+").replace(/_/g, "/")));
+    } catch {
+      return null;
+    }
+    if (!data || typeof data !== "object" || !Array.isArray(data.s)) return null;
+    const foreign = format !== OWN_FORMAT;
+    if (foreign && !Object.values(format.codes).includes(data[format.field])) return null;
+    const extra = foreign ? current[EXTRA_KEY] : Object.keys(format.codes).find((key) => format.codes[key] === data[format.field]) ?? null;
+    const valid = validateSettings({
+      version: SCHEMA_VERSION,
+      gradient: data.g === 1 ? true : data.g === 0 ? false : null,
+      [EXTRA_KEY]: extra,
+      hover: current.hover,
+      // not in codes (#3, #8): an import keeps the current hover effect
+      stops: data.s.map(
+        (value, i) => value === "t" ? { id: `s${i + 1}`, kind: "theme" } : { id: `s${i + 1}`, kind: "custom", color: typeof value === "string" ? `#${value}` : null }
+      )
+    });
+    return valid && { settings: valid, from };
+  }
+
+  // src/shared/presets.js
+  var BUILT_IN_PRESETS = [
+    { id: "b:void", name: "Void", colours: ["#8372fd", "#5a82ff", "#8372fd"] },
+    { id: "b:sunset", name: "Sunset", colours: ["#6e33ff", "#ff5f6d", "#ffc371"] },
+    { id: "b:aurora", name: "Aurora", colours: ["#00f5a0", "#00d9f5", "#7f5af0"] },
+    { id: "b:neon", name: "Neon", colours: ["#ff00cc", "#3333ff", "#33f7ff"] },
+    { id: "b:fairy", name: "Fairy", colours: ["#ff59d1", "#ffb800", "#77bc00"] }
+  ].map((preset) => ({ ...preset, builtIn: true }));
+  var presets = [];
+  function setPresets(next) {
+    presets = next;
+  }
+  function snapshot(s) {
+    return { gradient: s.gradient, [EXTRA_KEY]: s[EXTRA_KEY], stops: s.stops.map((stop) => ({ ...stop })) };
+  }
+  function presetSettings(preset, current = settings) {
+    if (!preset.builtIn) return { version: SCHEMA_VERSION, ...structuredClone(preset.settings), hover: current.hover };
+    const stops = preset.colours.map((color, i) => ({ id: `s${i + 1}`, kind: "custom", color }));
+    return { version: SCHEMA_VERSION, gradient: true, [EXTRA_KEY]: current[EXTRA_KEY], hover: current.hover, stops };
+  }
+  function sameSettings(a, b) {
+    return a.gradient === b.gradient && a[EXTRA_KEY] === b[EXTRA_KEY] && a.stops.length === b.stops.length && a.stops.every((stop, i) => stop.kind === b.stops[i].kind && stop.color === b.stops[i].color);
+  }
+  var matchesPreset = (preset, s = settings) => sameSettings(s, presetSettings(preset, s));
+  var presetById = (id) => BUILT_IN_PRESETS.find((p) => p.id === id) ?? presets.find((p) => p.id === id) ?? null;
+  function validatePreset(entry) {
+    if (!entry || typeof entry !== "object" || typeof entry.id !== "string" || !entry.id || typeof entry.name !== "string")
+      return null;
+    const name = entry.name.trim();
+    if (!name || name.length > PRESET_NAME_MAX) return null;
+    const valid = validateSettings({ ...entry.settings, version: SCHEMA_VERSION });
+    return valid && { id: entry.id, name, settings: snapshot(valid) };
+  }
+  function loadPresets(raw = Spicetify.LocalStorage.get(presetsKey())) {
+    if (raw == null) return [];
+    let data = null;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+    }
+    if (!data || data.version !== PRESETS_VERSION || !Array.isArray(data.presets)) {
+      console.warn(`[${P}] Saved presets were unreadable and have been ignored.`);
+      return [];
+    }
+    const list = [];
+    for (const entry of data.presets) {
+      const preset = validatePreset(entry);
+      if (!preset || list.length >= MAX_PRESETS || list.some((p) => p.id === preset.id)) continue;
+      preset.name = uniqueName(preset.name, list);
+      list.push(preset);
+    }
+    const dropped = data.presets.length - list.length;
+    if (dropped) console.warn(`[${P}] ${dropped} saved preset${dropped === 1 ? " was" : "s were"} invalid and dropped.`);
+    return list;
+  }
+  function savePresets() {
+    Spicetify.LocalStorage.set(presetsKey(), JSON.stringify({ version: PRESETS_VERSION, presets }));
+  }
+  function uniqueName(name, list = presets, exceptId = null) {
+    const base = name.trim().slice(0, PRESET_NAME_MAX);
+    const taken = new Set([...BUILT_IN_PRESETS, ...list].filter((p) => p.id !== exceptId).map((p) => p.name.toLowerCase()));
+    if (!taken.has(base.toLowerCase())) return base;
+    for (let n = 2; ; n++) {
+      const suffix = ` (${n})`;
+      const candidate = base.slice(0, PRESET_NAME_MAX - suffix.length).trimEnd() + suffix;
+      if (!taken.has(candidate.toLowerCase())) return candidate;
+    }
+  }
+  var defaultPresetName = () => uniqueName(`Preset ${presets.length + 1}`);
+  function nextPresetId() {
+    const ids = new Set(presets.map((p) => p.id));
+    let n = 1;
+    while (ids.has(`p${n}`)) n++;
+    return `p${n}`;
+  }
+  function addPreset(name) {
+    if (presets.length >= MAX_PRESETS) return null;
+    const preset = { id: nextPresetId(), name: uniqueName(name.trim() || defaultPresetName()), settings: snapshot(settings) };
+    presets.push(preset);
+    savePresets();
+    return preset;
+  }
+  function renamePreset(id, name) {
+    const preset = presets.find((p) => p.id === id);
+    if (!preset || !name.trim()) return false;
+    preset.name = uniqueName(name, presets, id);
+    savePresets();
+    return true;
+  }
+  function updatePreset(id) {
+    const preset = presets.find((p) => p.id === id);
+    if (!preset) return false;
+    preset.settings = snapshot(settings);
+    savePresets();
+    return true;
+  }
+  function deletePreset(id) {
+    const index = presets.findIndex((p) => p.id === id);
+    if (index === -1) return null;
+    const [preset] = presets.splice(index, 1);
+    savePresets();
+    return { preset, index };
+  }
+  function restorePreset({ preset, index }) {
+    presets.splice(Math.min(index, presets.length), 0, preset);
+    savePresets();
+  }
+
   // src/shared/stops.js
   var selectedId = null;
   function setSelectedId(id) {
@@ -302,6 +456,433 @@
     stop.kind = "theme";
     delete stop.color;
     update({ rerender: false });
+  }
+
+  // src/shared/reset.js
+  var RESET_CONFIRM_MS = 3e3;
+  var RESET_CONFIRM_LABEL = "Confirm reset?";
+  function enableReset(m) {
+    const button = m.resetButton;
+    let timer = 0;
+    const armed = () => button.classList.contains(`${P}-armed`);
+    const disarm = () => {
+      clearTimeout(timer);
+      timer = 0;
+      button.classList.remove(`${P}-armed`);
+      m.resetLabel.textContent = "Reset";
+    };
+    button.addEventListener("click", () => {
+      if (armed()) {
+        disarm();
+        resetSettings();
+        return;
+      }
+      button.classList.add(`${P}-armed`);
+      m.resetLabel.textContent = RESET_CONFIRM_LABEL;
+      timer = setTimeout(disarm, RESET_CONFIRM_MS);
+    });
+    button.addEventListener("blur", () => armed() && disarm());
+    disarmOnOutsideInput(m, () => armed() ? button : null, disarm);
+    m.cleanups.push(disarm);
+  }
+  function disarmOnOutsideInput(m, armedEl, disarm) {
+    const listen = (type, handler) => {
+      document.addEventListener(type, handler, true);
+      m.cleanups.push(() => document.removeEventListener(type, handler, true));
+    };
+    const elsewhere = (e) => {
+      const el = armedEl();
+      if (el && !el.contains(e.target)) disarm();
+    };
+    listen("pointerdown", elsewhere);
+    listen("click", elsewhere);
+    listen("keydown", (e) => {
+      const el = armedEl();
+      if (!el) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        disarm();
+      } else if (!el.contains(e.target)) disarm();
+    });
+  }
+
+  // src/shared/presets-ui.js
+  var UNDO_MS = 1e4;
+  var APPLY_LABEL = "Apply?";
+  var SAVE_LABEL = "Save the current settings as a preset";
+  var SAVE_FULL_LABEL = `Up to ${MAX_PRESETS} presets`;
+  var OWN_PRESET_HINT = "Right-click to rename, update or delete";
+  var chipEl = (id) => modal?.chips.querySelector(`.${P}-preset-chip[data-preset="${CSS.escape(id)}"]`) ?? null;
+  var isOwnPreset = (id) => presets.some((p) => p.id === id);
+  function enablePresets(m) {
+    m.chips.addEventListener("click", (e) => {
+      const chip = e.target.closest(`.${P}-chip`);
+      if (!chip || chip.disabled) return;
+      if (chip === m.saveChip) startNaming(m, "save");
+      else clickChip(m, chip);
+    });
+    m.chips.addEventListener("contextmenu", (e) => {
+      const chip = e.target.closest(`.${P}-preset-chip`);
+      if (!chip || !isOwnPreset(chip.dataset.preset)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const id = chip.dataset.preset;
+      if (popover?.id === id && performance.now() - popover.openedAt < 500) return;
+      const r = chip.getBoundingClientRect();
+      const onChip = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      openChipMenu(id, onChip ? { at: { x: e.clientX, y: e.clientY } } : { keyboard: true });
+    });
+    m.chips.addEventListener("keydown", (e) => {
+      const chip = e.target.closest(`.${P}-preset-chip`);
+      if (!chip || !isOwnPreset(chip.dataset.preset) || !(e.key === "ContextMenu" || e.shiftKey && e.key === "F10")) return;
+      e.preventDefault();
+      openChipMenu(chip.dataset.preset, { keyboard: true });
+    });
+    m.chips.addEventListener("focusout", (e) => m.armed?.chip === e.target && disarmChip(m));
+    disarmOnOutsideInput(m, () => m.armed?.chip ?? null, () => disarmChip(m));
+    m.nameField.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        stopNaming(m, { commit: true });
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        stopNaming(m, { refocus: true });
+      }
+    });
+    m.nameField.addEventListener("blur", () => stopNaming(m));
+    m.renameItem.addEventListener("click", () => runChipAction((id) => startNaming(m, "rename", id)));
+    m.updatePresetItem.addEventListener(
+      "click",
+      () => runChipAction((id) => {
+        if (pendingUndo?.kind === "preset") clearUndo();
+        if (updatePreset(id)) renderChipsLater(m, id);
+      })
+    );
+    m.deletePresetItem.addEventListener("click", () => runChipAction((id) => deleteWithUndo(m, id)));
+    m.undoButton.addEventListener("click", runUndo);
+    enableSharing(m);
+    m.cleanups.push(() => {
+      disarmChip(m);
+      clearUndo();
+    });
+  }
+  var EXPORT_TITLE = "Copy a share code to the clipboard";
+  var EXPORT_LABEL = "Export";
+  var COPIED_LABEL = "Copied";
+  var COPIED_MS = 2e3;
+  var COPY_HINT = /Mac/i.test(navigator.platform) ? "Press ⌘C to copy" : "Press Ctrl+C to copy";
+  var IMPORT_ERROR = "Not a valid code";
+  var PREVIEW_CODE_MESSAGE = "Previewing code — Apply to use it";
+  function enableSharing(m) {
+    m.exportButton.addEventListener("click", () => copyCode(m));
+    m.codeOutput.addEventListener("blur", () => m.codeFallback.hidden = true);
+    m.importButton.addEventListener("click", () => toggleImport(m));
+    m.importApply.addEventListener("click", () => importCode(m));
+    m.codeInput.addEventListener("input", () => {
+      setImportError(m, false);
+      renderPreview();
+      renderStatus();
+    });
+    m.codeInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        importCode(m);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleImport(m, false);
+        m.importButton.focus({ preventScroll: true });
+      }
+    });
+    m.cleanups.push(() => clearTimeout(m.copiedTimer));
+  }
+  async function copyCode(m) {
+    const code = encodeCode(settings);
+    const tier = await writeClipboard(code);
+    if (modal !== m) return tier;
+    showExportCopied(m, !!tier);
+    if (!tier) {
+      m.codeOutput.value = code;
+      m.codeFallback.hidden = false;
+      m.codeOutput.focus({ preventScroll: true });
+      m.codeOutput.select();
+      return null;
+    }
+    m.codeFallback.hidden = true;
+    m.announce.textContent = "Share code copied";
+    return tier;
+  }
+  function showExportCopied(m, copied) {
+    clearTimeout(m.copiedTimer);
+    m.exportLabel.textContent = copied ? COPIED_LABEL : EXPORT_LABEL;
+    m.exportIcon.toggleAttribute("hidden", copied);
+    m.exportCheck.toggleAttribute("hidden", !copied);
+    if (copied) m.copiedTimer = setTimeout(() => showExportCopied(m, false), COPIED_MS);
+  }
+  function toggleImport(m, open = m.importPanel.hidden) {
+    m.importPanel.hidden = !open;
+    m.importButton.setAttribute("aria-expanded", String(open));
+    if (open) {
+      m.codeInput.value = "";
+      setImportError(m, false);
+      m.codeInput.focus({ preventScroll: true });
+    }
+    if (modal !== m) return;
+    renderPreview();
+    renderStatus();
+  }
+  function setImportError(m, invalid) {
+    if (invalid) m.codeInput.setAttribute("aria-invalid", "true");
+    else m.codeInput.removeAttribute("aria-invalid");
+    m.importError.textContent = invalid ? IMPORT_ERROR : "";
+  }
+  function importCode(m) {
+    const decoded = decodeShareCode(m.codeInput.value);
+    if (!decoded) {
+      setImportError(m, true);
+      return false;
+    }
+    toggleImport(m, false);
+    m.importButton.focus({ preventScroll: true });
+    applySettings(decoded.settings, IMPORTED[decoded.from], m.importButton);
+    return true;
+  }
+  function clickChip(m, chip) {
+    const preset = presetById(chip.dataset.preset);
+    if (!preset || matchesPreset(preset)) return;
+    if (m.armed?.chip !== chip) return armChip(m, chip, preset);
+    disarmChip(m);
+    applySettings(presetSettings(preset), `Applied "${preset.name}"`, chip);
+  }
+  function armChip(m, chip, preset) {
+    disarmChip(m);
+    chip.classList.add(`${P}-armed`);
+    chip.querySelector(`.${P}-chip-label`).textContent = APPLY_LABEL;
+    chip.setAttribute("aria-label", `Apply "${preset.name}"?`);
+    m.armed = { chip, name: preset.name, settings: presetSettings(preset) };
+    renderPreview();
+    renderStatus();
+  }
+  function disarmChip(m) {
+    if (!m.armed) return;
+    const { chip } = m.armed;
+    m.armed = null;
+    const name = presetById(chip.dataset.preset)?.name ?? "";
+    chip.classList.remove(`${P}-armed`);
+    chip.querySelector(`.${P}-chip-label`).textContent = name;
+    chip.setAttribute("aria-label", name);
+    if (modal !== m) return;
+    renderPreview();
+    renderStatus();
+  }
+  function previewing(m) {
+    if (m.armed) return { settings: m.armed.settings, message: `Previewing "${m.armed.name}" — click it again to apply, Esc to cancel` };
+    const code = m.importPanel.hidden ? null : decodeShareCode(m.codeInput.value);
+    return code && { settings: code.settings, message: PREVIEW_CODE_MESSAGE };
+  }
+  function applySettings(next, message, focusAfterUndo = null) {
+    const previous = structuredClone(settings);
+    setSettings(next);
+    setSelectedId(settings.stops[0].id);
+    settingsReplaced();
+    update();
+    offerUndo(message, (hadFocus) => {
+      setSettings(previous);
+      setSelectedId(previous.stops[0].id);
+      settingsReplaced();
+      update();
+      if (hadFocus && focusAfterUndo?.isConnected) focusAfterUndo.focus({ preventScroll: true });
+    }, { trackSettings: true });
+  }
+  function deleteWithUndo(m, id) {
+    const removed = deletePreset(id);
+    if (!removed) return;
+    renderChipsLater(m, (presets[removed.index] ?? presets[removed.index - 1])?.id ?? "save");
+    offerUndo(`Deleted "${removed.preset.name}"`, (hadFocus) => {
+      restorePreset(removed);
+      renderChipsLater(m, hadFocus ? removed.preset.id : null);
+    }, { kind: "preset" });
+  }
+  var pendingUndo = null;
+  function offerUndo(message, restore, { trackSettings = false, kind = "settings" } = {}) {
+    clearUndo();
+    const after = trackSettings ? JSON.stringify(settings) : null;
+    pendingUndo = { message, kind, restore, after, timer: setTimeout(clearUndo, UNDO_MS) };
+    renderStatus();
+  }
+  function clearUndo() {
+    if (!pendingUndo) return;
+    clearTimeout(pendingUndo.timer);
+    pendingUndo = null;
+    renderStatus();
+  }
+  function runUndo() {
+    const undo = pendingUndo;
+    if (!undo) return;
+    const hadFocus = !!modal && document.activeElement === modal.undoButton;
+    clearUndo();
+    undo.restore(hadFocus);
+  }
+  function renderStatus() {
+    if (!modal) return;
+    const preview = previewing(modal);
+    const undo = !preview && pendingUndo;
+    modal.undoLine.classList.toggle(`${P}-has-status`, !!(preview || undo));
+    modal.undoText.textContent = preview ? preview.message : undo ? `${undo.message} · ` : "";
+    modal.undoButton.hidden = !undo;
+  }
+  function renderChips(m) {
+    disarmChip(m);
+    if (!m.naming) m.saveChip.after(m.nameField);
+    for (const chip of m.chips.querySelectorAll(`.${P}-preset-chip`)) chip.remove();
+    m.builtInRow.append(...BUILT_IN_PRESETS.map(presetChip));
+    for (const preset of presets) m.saveChip.before(presetChip(preset));
+    const full = presets.length >= MAX_PRESETS;
+    m.saveChip.disabled = full;
+    m.saveChip.title = full ? SAVE_FULL_LABEL : SAVE_LABEL;
+    renderPresetStates();
+  }
+  function renderChipsLater(m, focusId = null) {
+    closePopover();
+    disarmChip(m);
+    setTimeout(() => {
+      if (modal !== m) return;
+      renderChips(m);
+      const target = focusId === "save" ? m.saveChip : focusId ? chipEl(focusId) : null;
+      target?.focus({ preventScroll: true });
+    }, 0);
+  }
+  function presetChip(preset) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = `${P}-chip ${P}-preset-chip`;
+    chip.dataset.preset = preset.id;
+    chip.setAttribute("aria-pressed", "false");
+    chip.setAttribute("aria-label", preset.name);
+    chip.title = preset.builtIn ? preset.name : `${preset.name}
+${OWN_PRESET_HINT}`;
+    chip.innerHTML = `<span class="${P}-chip-swatch" aria-hidden="true"></span><span class="${P}-chip-text"><span class="${P}-chip-label" aria-live="polite"></span><span class="${P}-sizer" aria-hidden="true"></span><span class="${P}-sizer" aria-hidden="true">${APPLY_LABEL}</span></span>`;
+    chip.querySelector(`.${P}-chip-swatch`).style.backgroundImage = previewImage(presetSettings(preset));
+    chip.querySelector(`.${P}-chip-label`).textContent = preset.name;
+    chip.querySelector(`.${P}-sizer`).textContent = preset.name;
+    return chip;
+  }
+  function renderPresetStates() {
+    if (!modal) return;
+    for (const chip of modal.chips.querySelectorAll(`.${P}-preset-chip`)) {
+      const preset = presetById(chip.dataset.preset);
+      chip.setAttribute("aria-pressed", String(!!preset && matchesPreset(preset)));
+    }
+  }
+  function startNaming(m, mode, id = null) {
+    if (m.naming) return;
+    const preset = mode === "rename" ? presets.find((p) => p.id === id) : null;
+    const chip = mode === "rename" ? chipEl(id) : m.saveChip;
+    if (!chip || mode === "rename" && !preset) return;
+    disarmChip(m);
+    m.naming = { mode, id, chip };
+    chip.before(m.nameField);
+    chip.hidden = true;
+    m.nameField.value = preset ? preset.name : defaultPresetName();
+    m.nameField.setAttribute("aria-label", preset ? `New name for "${preset.name}"` : "Preset name");
+    m.nameField.hidden = false;
+    m.nameField.focus({ preventScroll: true });
+    m.nameField.select();
+  }
+  function stopNaming(m, { commit = false, refocus = false } = {}) {
+    const naming = m.naming;
+    if (!naming) return;
+    m.naming = null;
+    m.nameField.hidden = true;
+    m.saveChip.after(m.nameField);
+    naming.chip.hidden = false;
+    if (!commit) {
+      if (refocus) naming.chip.focus({ preventScroll: true });
+      return;
+    }
+    if (pendingUndo?.kind === "preset") clearUndo();
+    if (naming.mode === "save") renderChipsLater(m, addPreset(m.nameField.value)?.id ?? "save");
+    else {
+      renamePreset(naming.id, m.nameField.value);
+      renderChipsLater(m, naming.id);
+    }
+  }
+  function openChipMenu(id, { at = null, keyboard = false } = {}) {
+    const anchor = chipEl(id);
+    if (!anchor || !isOwnPreset(id)) return;
+    disarmChip(modal);
+    setMenuKind("chip");
+    if (showPopover(id, modal.menu, at, anchor) && keyboard) menuItems()[0]?.focus({ preventScroll: true });
+  }
+  function runChipAction(action) {
+    if (!popover) return;
+    const { id } = popover;
+    closePopover();
+    action(id);
+  }
+
+  // src/shared/settings.js
+  var settings;
+  function setSettings(next) {
+    settings = next;
+  }
+  function migrate(data) {
+    let current = data;
+    while (current && typeof current === "object" && Number.isInteger(current.version) && current.version < SCHEMA_VERSION && typeof MIGRATIONS[current.version] === "function") {
+      current = MIGRATIONS[current.version](structuredClone(current));
+    }
+    return current;
+  }
+  function loadSettings(raw = Spicetify.LocalStorage.get(settingsKey())) {
+    if (raw == null) return defaultSettings();
+    let data = null;
+    try {
+      data = migrate(JSON.parse(raw));
+    } catch {
+    }
+    const valid = validateSettings(data);
+    if (valid) return valid;
+    if (KEEP_NEWER_SETTINGS && Number.isInteger(data?.version) && data.version > SCHEMA_VERSION) {
+      console.warn(`[${P}] Saved settings are from a newer version of the extension; using defaults.`);
+      return defaultSettings();
+    }
+    console.warn(`[${P}] Saved settings were invalid and have been reset to defaults.`);
+    const defaults = defaultSettings();
+    Spicetify.LocalStorage.set(settingsKey(), JSON.stringify(defaults));
+    return defaults;
+  }
+  var saveTimer = 0;
+  function saveSettings() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flushSettings, SAVE_DELAY);
+  }
+  function flushSettings() {
+    if (!saveTimer) return;
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+    Spicetify.LocalStorage.set(settingsKey(), JSON.stringify(settings));
+  }
+  function cancelSave() {
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+  }
+  function stopColour(stop) {
+    return stop.kind === "theme" ? THEME_COLOUR : stop.color;
+  }
+  function isInert(s) {
+    return !s.gradient && s.stops[0].kind === "theme";
+  }
+  function update({ rerender = true } = {}) {
+    applyCss();
+    if (modal) {
+      rerender ? renderModal() : renderPreview();
+      renderPresetStates();
+    }
+    if (pendingUndo?.after && pendingUndo.after !== JSON.stringify(settings)) clearUndo();
+    afterSettingsChange();
+    saveSettings();
   }
 
   // src/shared/stop-editor.js
@@ -715,521 +1296,6 @@ ${REORDER_HINT}` : "");
     });
   }
 
-  // src/shared/codes.js
-  var CODE_FORMATS = {
-    gpb: { prefix: "gpb1:", field: "m", key: "mode", codes: { compress: "c", anchored: "a", slide: "s" } },
-    gcb: { prefix: "gcb1:", field: "x", key: "textColour", codes: { auto: "a", black: "b", white: "w", default: "d" } }
-  };
-  var OWN_FORMAT = CODE_FORMATS[P];
-  var CODE_PREFIX = OWN_FORMAT.prefix;
-  var toBase64Url = (data) => btoa(JSON.stringify(data)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  function encodeCode(s) {
-    return CODE_PREFIX + toBase64Url({
-      g: s.gradient ? 1 : 0,
-      [OWN_FORMAT.field]: OWN_FORMAT.codes[s[EXTRA_KEY]],
-      s: s.stops.map((stop) => stop.kind === "theme" ? "t" : stop.color.slice(1))
-    });
-  }
-  function decodeShareCode(text, current = settings) {
-    const code = String(text ?? "").trim();
-    const from = Object.keys(CODE_FORMATS).find((id) => code.startsWith(CODE_FORMATS[id].prefix));
-    const format = CODE_FORMATS[from];
-    const body = format ? code.slice(format.prefix.length) : "";
-    if (!format || !/^[A-Za-z0-9_-]+$/.test(body)) return null;
-    let data = null;
-    try {
-      data = JSON.parse(atob(body.replace(/-/g, "+").replace(/_/g, "/")));
-    } catch {
-      return null;
-    }
-    if (!data || typeof data !== "object" || !Array.isArray(data.s)) return null;
-    const foreign = format !== OWN_FORMAT;
-    if (foreign && !Object.values(format.codes).includes(data[format.field])) return null;
-    const extra = foreign ? current[EXTRA_KEY] : Object.keys(format.codes).find((key) => format.codes[key] === data[format.field]) ?? null;
-    const valid = validateSettings({
-      version: SCHEMA_VERSION,
-      gradient: data.g === 1 ? true : data.g === 0 ? false : null,
-      [EXTRA_KEY]: extra,
-      stops: data.s.map(
-        (value, i) => value === "t" ? { id: `s${i + 1}`, kind: "theme" } : { id: `s${i + 1}`, kind: "custom", color: typeof value === "string" ? `#${value}` : null }
-      )
-    });
-    return valid && { settings: valid, from };
-  }
-
-  // src/shared/presets.js
-  var BUILT_IN_PRESETS = [
-    { id: "b:void", name: "Void", colours: ["#8372fd", "#5a82ff", "#8372fd"] },
-    { id: "b:sunset", name: "Sunset", colours: ["#6e33ff", "#ff5f6d", "#ffc371"] },
-    { id: "b:aurora", name: "Aurora", colours: ["#00f5a0", "#00d9f5", "#7f5af0"] },
-    { id: "b:neon", name: "Neon", colours: ["#ff00cc", "#3333ff", "#33f7ff"] },
-    { id: "b:fairy", name: "Fairy", colours: ["#ff59d1", "#ffb800", "#77bc00"] }
-  ].map((preset) => ({ ...preset, builtIn: true }));
-  var presets = [];
-  function setPresets(next) {
-    presets = next;
-  }
-  function snapshot(s) {
-    return { gradient: s.gradient, [EXTRA_KEY]: s[EXTRA_KEY], stops: s.stops.map((stop) => ({ ...stop })) };
-  }
-  function presetSettings(preset, current = settings) {
-    if (!preset.builtIn) return { version: SCHEMA_VERSION, ...structuredClone(preset.settings) };
-    const stops = preset.colours.map((color, i) => ({ id: `s${i + 1}`, kind: "custom", color }));
-    return { version: SCHEMA_VERSION, gradient: true, [EXTRA_KEY]: current[EXTRA_KEY], stops };
-  }
-  function sameSettings(a, b) {
-    return a.gradient === b.gradient && a[EXTRA_KEY] === b[EXTRA_KEY] && a.stops.length === b.stops.length && a.stops.every((stop, i) => stop.kind === b.stops[i].kind && stop.color === b.stops[i].color);
-  }
-  var matchesPreset = (preset, s = settings) => sameSettings(s, presetSettings(preset, s));
-  var presetById = (id) => BUILT_IN_PRESETS.find((p) => p.id === id) ?? presets.find((p) => p.id === id) ?? null;
-  function validatePreset(entry) {
-    if (!entry || typeof entry !== "object" || typeof entry.id !== "string" || !entry.id || typeof entry.name !== "string")
-      return null;
-    const name = entry.name.trim();
-    if (!name || name.length > PRESET_NAME_MAX) return null;
-    const valid = validateSettings({ ...entry.settings, version: SCHEMA_VERSION });
-    return valid && { id: entry.id, name, settings: snapshot(valid) };
-  }
-  function loadPresets(raw = Spicetify.LocalStorage.get(presetsKey())) {
-    if (raw == null) return [];
-    let data = null;
-    try {
-      data = JSON.parse(raw);
-    } catch {
-    }
-    if (!data || data.version !== PRESETS_VERSION || !Array.isArray(data.presets)) {
-      console.warn(`[${P}] Saved presets were unreadable and have been ignored.`);
-      return [];
-    }
-    const list = [];
-    for (const entry of data.presets) {
-      const preset = validatePreset(entry);
-      if (!preset || list.length >= MAX_PRESETS || list.some((p) => p.id === preset.id)) continue;
-      preset.name = uniqueName(preset.name, list);
-      list.push(preset);
-    }
-    const dropped = data.presets.length - list.length;
-    if (dropped) console.warn(`[${P}] ${dropped} saved preset${dropped === 1 ? " was" : "s were"} invalid and dropped.`);
-    return list;
-  }
-  function savePresets() {
-    Spicetify.LocalStorage.set(presetsKey(), JSON.stringify({ version: PRESETS_VERSION, presets }));
-  }
-  function uniqueName(name, list = presets, exceptId = null) {
-    const base = name.trim().slice(0, PRESET_NAME_MAX);
-    const taken = new Set([...BUILT_IN_PRESETS, ...list].filter((p) => p.id !== exceptId).map((p) => p.name.toLowerCase()));
-    if (!taken.has(base.toLowerCase())) return base;
-    for (let n = 2; ; n++) {
-      const suffix = ` (${n})`;
-      const candidate = base.slice(0, PRESET_NAME_MAX - suffix.length).trimEnd() + suffix;
-      if (!taken.has(candidate.toLowerCase())) return candidate;
-    }
-  }
-  var defaultPresetName = () => uniqueName(`Preset ${presets.length + 1}`);
-  function nextPresetId() {
-    const ids = new Set(presets.map((p) => p.id));
-    let n = 1;
-    while (ids.has(`p${n}`)) n++;
-    return `p${n}`;
-  }
-  function addPreset(name) {
-    if (presets.length >= MAX_PRESETS) return null;
-    const preset = { id: nextPresetId(), name: uniqueName(name.trim() || defaultPresetName()), settings: snapshot(settings) };
-    presets.push(preset);
-    savePresets();
-    return preset;
-  }
-  function renamePreset(id, name) {
-    const preset = presets.find((p) => p.id === id);
-    if (!preset || !name.trim()) return false;
-    preset.name = uniqueName(name, presets, id);
-    savePresets();
-    return true;
-  }
-  function updatePreset(id) {
-    const preset = presets.find((p) => p.id === id);
-    if (!preset) return false;
-    preset.settings = snapshot(settings);
-    savePresets();
-    return true;
-  }
-  function deletePreset(id) {
-    const index = presets.findIndex((p) => p.id === id);
-    if (index === -1) return null;
-    const [preset] = presets.splice(index, 1);
-    savePresets();
-    return { preset, index };
-  }
-  function restorePreset({ preset, index }) {
-    presets.splice(Math.min(index, presets.length), 0, preset);
-    savePresets();
-  }
-
-  // src/shared/reset.js
-  var RESET_CONFIRM_MS = 3e3;
-  var RESET_CONFIRM_LABEL = "Confirm reset?";
-  function enableReset(m) {
-    const button = m.resetButton;
-    let timer = 0;
-    const armed = () => button.classList.contains(`${P}-armed`);
-    const disarm = () => {
-      clearTimeout(timer);
-      timer = 0;
-      button.classList.remove(`${P}-armed`);
-      m.resetLabel.textContent = "Reset";
-    };
-    button.addEventListener("click", () => {
-      if (armed()) {
-        disarm();
-        resetSettings();
-        return;
-      }
-      button.classList.add(`${P}-armed`);
-      m.resetLabel.textContent = RESET_CONFIRM_LABEL;
-      timer = setTimeout(disarm, RESET_CONFIRM_MS);
-    });
-    button.addEventListener("blur", () => armed() && disarm());
-    disarmOnOutsideInput(m, () => armed() ? button : null, disarm);
-    m.cleanups.push(disarm);
-  }
-  function disarmOnOutsideInput(m, armedEl, disarm) {
-    const listen = (type, handler) => {
-      document.addEventListener(type, handler, true);
-      m.cleanups.push(() => document.removeEventListener(type, handler, true));
-    };
-    const elsewhere = (e) => {
-      const el = armedEl();
-      if (el && !el.contains(e.target)) disarm();
-    };
-    listen("pointerdown", elsewhere);
-    listen("click", elsewhere);
-    listen("keydown", (e) => {
-      const el = armedEl();
-      if (!el) return;
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        disarm();
-      } else if (!el.contains(e.target)) disarm();
-    });
-  }
-
-  // src/shared/presets-ui.js
-  var UNDO_MS = 1e4;
-  var APPLY_LABEL = "Apply?";
-  var SAVE_LABEL = "Save the current settings as a preset";
-  var SAVE_FULL_LABEL = `Up to ${MAX_PRESETS} presets`;
-  var OWN_PRESET_HINT = "Right-click to rename, update or delete";
-  var chipEl = (id) => modal?.chips.querySelector(`.${P}-preset-chip[data-preset="${CSS.escape(id)}"]`) ?? null;
-  var isOwnPreset = (id) => presets.some((p) => p.id === id);
-  function enablePresets(m) {
-    m.chips.addEventListener("click", (e) => {
-      const chip = e.target.closest(`.${P}-chip`);
-      if (!chip || chip.disabled) return;
-      if (chip === m.saveChip) startNaming(m, "save");
-      else clickChip(m, chip);
-    });
-    m.chips.addEventListener("contextmenu", (e) => {
-      const chip = e.target.closest(`.${P}-preset-chip`);
-      if (!chip || !isOwnPreset(chip.dataset.preset)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const id = chip.dataset.preset;
-      if (popover?.id === id && performance.now() - popover.openedAt < 500) return;
-      const r = chip.getBoundingClientRect();
-      const onChip = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-      openChipMenu(id, onChip ? { at: { x: e.clientX, y: e.clientY } } : { keyboard: true });
-    });
-    m.chips.addEventListener("keydown", (e) => {
-      const chip = e.target.closest(`.${P}-preset-chip`);
-      if (!chip || !isOwnPreset(chip.dataset.preset) || !(e.key === "ContextMenu" || e.shiftKey && e.key === "F10")) return;
-      e.preventDefault();
-      openChipMenu(chip.dataset.preset, { keyboard: true });
-    });
-    m.chips.addEventListener("focusout", (e) => m.armed?.chip === e.target && disarmChip(m));
-    disarmOnOutsideInput(m, () => m.armed?.chip ?? null, () => disarmChip(m));
-    m.nameField.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        stopNaming(m, { commit: true });
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        stopNaming(m, { refocus: true });
-      }
-    });
-    m.nameField.addEventListener("blur", () => stopNaming(m));
-    m.renameItem.addEventListener("click", () => runChipAction((id) => startNaming(m, "rename", id)));
-    m.updatePresetItem.addEventListener(
-      "click",
-      () => runChipAction((id) => {
-        if (pendingUndo?.kind === "preset") clearUndo();
-        if (updatePreset(id)) renderChipsLater(m, id);
-      })
-    );
-    m.deletePresetItem.addEventListener("click", () => runChipAction((id) => deleteWithUndo(m, id)));
-    m.undoButton.addEventListener("click", runUndo);
-    enableSharing(m);
-    m.cleanups.push(() => {
-      disarmChip(m);
-      clearUndo();
-    });
-  }
-  var EXPORT_TITLE = "Copy a share code to the clipboard";
-  var EXPORT_LABEL = "Export";
-  var COPIED_LABEL = "Copied";
-  var COPIED_MS = 2e3;
-  var COPY_HINT = /Mac/i.test(navigator.platform) ? "Press ⌘C to copy" : "Press Ctrl+C to copy";
-  var IMPORT_ERROR = "Not a valid code";
-  var PREVIEW_CODE_MESSAGE = "Previewing code — Apply to use it";
-  function enableSharing(m) {
-    m.exportButton.addEventListener("click", () => copyCode(m));
-    m.codeOutput.addEventListener("blur", () => m.codeFallback.hidden = true);
-    m.importButton.addEventListener("click", () => toggleImport(m));
-    m.importApply.addEventListener("click", () => importCode(m));
-    m.codeInput.addEventListener("input", () => {
-      setImportError(m, false);
-      renderPreview();
-      renderStatus();
-    });
-    m.codeInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        importCode(m);
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        toggleImport(m, false);
-        m.importButton.focus({ preventScroll: true });
-      }
-    });
-    m.cleanups.push(() => clearTimeout(m.copiedTimer));
-  }
-  async function copyCode(m) {
-    const code = encodeCode(settings);
-    const tier = await writeClipboard(code);
-    if (modal !== m) return tier;
-    showExportCopied(m, !!tier);
-    if (!tier) {
-      m.codeOutput.value = code;
-      m.codeFallback.hidden = false;
-      m.codeOutput.focus({ preventScroll: true });
-      m.codeOutput.select();
-      return null;
-    }
-    m.codeFallback.hidden = true;
-    m.announce.textContent = "Share code copied";
-    return tier;
-  }
-  function showExportCopied(m, copied) {
-    clearTimeout(m.copiedTimer);
-    m.exportLabel.textContent = copied ? COPIED_LABEL : EXPORT_LABEL;
-    m.exportIcon.toggleAttribute("hidden", copied);
-    m.exportCheck.toggleAttribute("hidden", !copied);
-    if (copied) m.copiedTimer = setTimeout(() => showExportCopied(m, false), COPIED_MS);
-  }
-  function toggleImport(m, open = m.importPanel.hidden) {
-    m.importPanel.hidden = !open;
-    m.importButton.setAttribute("aria-expanded", String(open));
-    if (open) {
-      m.codeInput.value = "";
-      setImportError(m, false);
-      m.codeInput.focus({ preventScroll: true });
-    }
-    if (modal !== m) return;
-    renderPreview();
-    renderStatus();
-  }
-  function setImportError(m, invalid) {
-    if (invalid) m.codeInput.setAttribute("aria-invalid", "true");
-    else m.codeInput.removeAttribute("aria-invalid");
-    m.importError.textContent = invalid ? IMPORT_ERROR : "";
-  }
-  function importCode(m) {
-    const decoded = decodeShareCode(m.codeInput.value);
-    if (!decoded) {
-      setImportError(m, true);
-      return false;
-    }
-    toggleImport(m, false);
-    m.importButton.focus({ preventScroll: true });
-    applySettings(decoded.settings, IMPORTED[decoded.from], m.importButton);
-    return true;
-  }
-  function clickChip(m, chip) {
-    const preset = presetById(chip.dataset.preset);
-    if (!preset || matchesPreset(preset)) return;
-    if (m.armed?.chip !== chip) return armChip(m, chip, preset);
-    disarmChip(m);
-    applySettings(presetSettings(preset), `Applied "${preset.name}"`, chip);
-  }
-  function armChip(m, chip, preset) {
-    disarmChip(m);
-    chip.classList.add(`${P}-armed`);
-    chip.querySelector(`.${P}-chip-label`).textContent = APPLY_LABEL;
-    chip.setAttribute("aria-label", `Apply "${preset.name}"?`);
-    m.armed = { chip, name: preset.name, settings: presetSettings(preset) };
-    renderPreview();
-    renderStatus();
-  }
-  function disarmChip(m) {
-    if (!m.armed) return;
-    const { chip } = m.armed;
-    m.armed = null;
-    const name = presetById(chip.dataset.preset)?.name ?? "";
-    chip.classList.remove(`${P}-armed`);
-    chip.querySelector(`.${P}-chip-label`).textContent = name;
-    chip.setAttribute("aria-label", name);
-    if (modal !== m) return;
-    renderPreview();
-    renderStatus();
-  }
-  function previewing(m) {
-    if (m.armed) return { settings: m.armed.settings, message: `Previewing "${m.armed.name}" — click it again to apply, Esc to cancel` };
-    const code = m.importPanel.hidden ? null : decodeShareCode(m.codeInput.value);
-    return code && { settings: code.settings, message: PREVIEW_CODE_MESSAGE };
-  }
-  function applySettings(next, message, focusAfterUndo = null) {
-    const previous = structuredClone(settings);
-    setSettings(next);
-    setSelectedId(settings.stops[0].id);
-    settingsReplaced();
-    update();
-    offerUndo(message, (hadFocus) => {
-      setSettings(previous);
-      setSelectedId(previous.stops[0].id);
-      settingsReplaced();
-      update();
-      if (hadFocus && focusAfterUndo?.isConnected) focusAfterUndo.focus({ preventScroll: true });
-    }, { trackSettings: true });
-  }
-  function deleteWithUndo(m, id) {
-    const removed = deletePreset(id);
-    if (!removed) return;
-    renderChipsLater(m, (presets[removed.index] ?? presets[removed.index - 1])?.id ?? "save");
-    offerUndo(`Deleted "${removed.preset.name}"`, (hadFocus) => {
-      restorePreset(removed);
-      renderChipsLater(m, hadFocus ? removed.preset.id : null);
-    }, { kind: "preset" });
-  }
-  var pendingUndo = null;
-  function offerUndo(message, restore, { trackSettings = false, kind = "settings" } = {}) {
-    clearUndo();
-    const after = trackSettings ? JSON.stringify(settings) : null;
-    pendingUndo = { message, kind, restore, after, timer: setTimeout(clearUndo, UNDO_MS) };
-    renderStatus();
-  }
-  function clearUndo() {
-    if (!pendingUndo) return;
-    clearTimeout(pendingUndo.timer);
-    pendingUndo = null;
-    renderStatus();
-  }
-  function runUndo() {
-    const undo = pendingUndo;
-    if (!undo) return;
-    const hadFocus = !!modal && document.activeElement === modal.undoButton;
-    clearUndo();
-    undo.restore(hadFocus);
-  }
-  function renderStatus() {
-    if (!modal) return;
-    const preview = previewing(modal);
-    const undo = !preview && pendingUndo;
-    modal.undoLine.classList.toggle(`${P}-has-status`, !!(preview || undo));
-    modal.undoText.textContent = preview ? preview.message : undo ? `${undo.message} · ` : "";
-    modal.undoButton.hidden = !undo;
-  }
-  function renderChips(m) {
-    disarmChip(m);
-    if (!m.naming) m.saveChip.after(m.nameField);
-    for (const chip of m.chips.querySelectorAll(`.${P}-preset-chip`)) chip.remove();
-    m.builtInRow.append(...BUILT_IN_PRESETS.map(presetChip));
-    for (const preset of presets) m.saveChip.before(presetChip(preset));
-    const full = presets.length >= MAX_PRESETS;
-    m.saveChip.disabled = full;
-    m.saveChip.title = full ? SAVE_FULL_LABEL : SAVE_LABEL;
-    renderPresetStates();
-  }
-  function renderChipsLater(m, focusId = null) {
-    closePopover();
-    disarmChip(m);
-    setTimeout(() => {
-      if (modal !== m) return;
-      renderChips(m);
-      const target = focusId === "save" ? m.saveChip : focusId ? chipEl(focusId) : null;
-      target?.focus({ preventScroll: true });
-    }, 0);
-  }
-  function presetChip(preset) {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = `${P}-chip ${P}-preset-chip`;
-    chip.dataset.preset = preset.id;
-    chip.setAttribute("aria-pressed", "false");
-    chip.setAttribute("aria-label", preset.name);
-    chip.title = preset.builtIn ? preset.name : `${preset.name}
-${OWN_PRESET_HINT}`;
-    chip.innerHTML = `<span class="${P}-chip-swatch" aria-hidden="true"></span><span class="${P}-chip-text"><span class="${P}-chip-label" aria-live="polite"></span><span class="${P}-sizer" aria-hidden="true"></span><span class="${P}-sizer" aria-hidden="true">${APPLY_LABEL}</span></span>`;
-    chip.querySelector(`.${P}-chip-swatch`).style.backgroundImage = previewImage(presetSettings(preset));
-    chip.querySelector(`.${P}-chip-label`).textContent = preset.name;
-    chip.querySelector(`.${P}-sizer`).textContent = preset.name;
-    return chip;
-  }
-  function renderPresetStates() {
-    if (!modal) return;
-    for (const chip of modal.chips.querySelectorAll(`.${P}-preset-chip`)) {
-      const preset = presetById(chip.dataset.preset);
-      chip.setAttribute("aria-pressed", String(!!preset && matchesPreset(preset)));
-    }
-  }
-  function startNaming(m, mode, id = null) {
-    if (m.naming) return;
-    const preset = mode === "rename" ? presets.find((p) => p.id === id) : null;
-    const chip = mode === "rename" ? chipEl(id) : m.saveChip;
-    if (!chip || mode === "rename" && !preset) return;
-    disarmChip(m);
-    m.naming = { mode, id, chip };
-    chip.before(m.nameField);
-    chip.hidden = true;
-    m.nameField.value = preset ? preset.name : defaultPresetName();
-    m.nameField.setAttribute("aria-label", preset ? `New name for "${preset.name}"` : "Preset name");
-    m.nameField.hidden = false;
-    m.nameField.focus({ preventScroll: true });
-    m.nameField.select();
-  }
-  function stopNaming(m, { commit = false, refocus = false } = {}) {
-    const naming = m.naming;
-    if (!naming) return;
-    m.naming = null;
-    m.nameField.hidden = true;
-    m.saveChip.after(m.nameField);
-    naming.chip.hidden = false;
-    if (!commit) {
-      if (refocus) naming.chip.focus({ preventScroll: true });
-      return;
-    }
-    if (pendingUndo?.kind === "preset") clearUndo();
-    if (naming.mode === "save") renderChipsLater(m, addPreset(m.nameField.value)?.id ?? "save");
-    else {
-      renamePreset(naming.id, m.nameField.value);
-      renderChipsLater(m, naming.id);
-    }
-  }
-  function openChipMenu(id, { at = null, keyboard = false } = {}) {
-    const anchor = chipEl(id);
-    if (!anchor || !isOwnPreset(id)) return;
-    disarmChip(modal);
-    setMenuKind("chip");
-    if (showPopover(id, modal.menu, at, anchor) && keyboard) menuItems()[0]?.focus({ preventScroll: true });
-  }
-  function runChipAction(action) {
-    if (!popover) return;
-    const { id } = popover;
-    closePopover();
-    action(id);
-  }
-
   // src/shared/modal.js
   function modalCss() {
     return `
@@ -1603,66 +1669,76 @@ ${OPTION_ROW_CSS.trim()}
     modal.switchButton.setAttribute("aria-checked", String(settings.gradient));
   }
 
-  // src/shared/settings.js
-  var settings;
-  function setSettings(next) {
-    settings = next;
+  // src/shared/hover.js
+  var DEFAULT_HOVER = "none";
+  var HOVER_LABELS = { none: "None", brighten: "Brighten", glow: "Glow" };
+  var BRIGHTEN = "brightness(1.2)";
+  var HOVER_TRANSITION = "filter .2s ease-out";
+  function validHover(value) {
+    const hover = value === void 0 ? DEFAULT_HOVER : value;
+    return HOVER_MODES.includes(hover) ? hover : null;
   }
-  function migrate(data) {
-    let current = data;
-    while (current && typeof current === "object" && Number.isInteger(current.version) && current.version < SCHEMA_VERSION && typeof MIGRATIONS[current.version] === "function") {
-      current = MIGRATIONS[current.version](structuredClone(current));
+  var MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+  var reducedMotion = () => !!window.matchMedia?.(MOTION_QUERY).matches;
+  function watchReducedMotion(apply) {
+    window.matchMedia?.(MOTION_QUERY).addEventListener?.("change", () => apply());
+  }
+  var HOVER_ROW_CSS = `
+.${P}-hover { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.${P}-hover-options { display: flex; gap: 2px; padding: 2px; border-radius: 500px; background-color: rgba(var(--spice-rgb-text), .1); }
+.${P}-hover-option { padding: 4px 12px; border: 1px solid transparent; border-radius: 500px; background: none; color: var(--spice-text); font: inherit; font-size: .875rem; font-weight: 700; white-space: nowrap; cursor: pointer; transition: background-color .15s; }
+.${P}-hover-option[aria-checked="true"] { background-color: var(--spice-button); }
+.${P}-hover-option.${P}-on-light { color: var(--spice-main); }
+.${P}-hover-option:hover:not([aria-checked="true"]) { background-color: rgba(var(--spice-rgb-text), .1); }
+.${P}-hover-option:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
+`;
+  function hoverRowMarkup() {
+    return `
+    <div class="${P}-hover">
+      <span class="${P}-label" id="${P}-hover-label">Hover</span>
+      <div class="${P}-hover-options" role="radiogroup" aria-labelledby="${P}-hover-label">
+        ${HOVER_MODES.map((mode) => `<button type="button" class="${P}-hover-option" role="radio" data-hover="${mode}">${HOVER_LABELS[mode]}</button>`).join("")}
+      </div>
+    </div>`;
+  }
+  function hoverRefs(root) {
+    return {
+      hover: root.querySelector(`.${P}-hover`),
+      hoverOptions: root.querySelector(`.${P}-hover-options`),
+      hoverButtons: [...root.querySelectorAll(`.${P}-hover-option`)]
+    };
+  }
+  function setHover(mode) {
+    if (!HOVER_MODES.includes(mode) || mode === settings.hover) return;
+    settings.hover = mode;
+    update({ rerender: false });
+    if (modal) renderHoverRow();
+  }
+  function enableHoverRow(m) {
+    m.hoverOptions.addEventListener("click", (e) => {
+      const button = e.target.closest(`.${P}-hover-option`);
+      if (button) setHover(button.dataset.hover);
+    });
+    m.hoverOptions.addEventListener("keydown", (e) => {
+      const button = e.target.closest(`.${P}-hover-option`);
+      if (!button || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const i = m.hoverButtons.indexOf(button);
+      const last = m.hoverButtons.length - 1;
+      const next = { ArrowLeft: i ? i - 1 : last, ArrowRight: i === last ? 0 : i + 1, Home: 0, End: last }[e.key];
+      if (next === void 0) return;
+      e.preventDefault();
+      setHover(m.hoverButtons[next].dataset.hover);
+      m.hoverButtons[next].focus();
+    });
+  }
+  function renderHoverRow() {
+    const onLight = labelOnLight(modal.hoverOptions);
+    for (const button of modal.hoverButtons) {
+      const checked = button.dataset.hover === settings.hover;
+      button.setAttribute("aria-checked", String(checked));
+      button.tabIndex = checked ? 0 : -1;
+      button.classList.toggle(`${P}-on-light`, checked && onLight);
     }
-    return current;
-  }
-  function loadSettings(raw = Spicetify.LocalStorage.get(settingsKey())) {
-    if (raw == null) return defaultSettings();
-    let data = null;
-    try {
-      data = migrate(JSON.parse(raw));
-    } catch {
-    }
-    const valid = validateSettings(data);
-    if (valid) return valid;
-    if (KEEP_NEWER_SETTINGS && Number.isInteger(data?.version) && data.version > SCHEMA_VERSION) {
-      console.warn(`[${P}] Saved settings are from a newer version of the extension; using defaults.`);
-      return defaultSettings();
-    }
-    console.warn(`[${P}] Saved settings were invalid and have been reset to defaults.`);
-    const defaults = defaultSettings();
-    Spicetify.LocalStorage.set(settingsKey(), JSON.stringify(defaults));
-    return defaults;
-  }
-  var saveTimer = 0;
-  function saveSettings() {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(flushSettings, SAVE_DELAY);
-  }
-  function flushSettings() {
-    if (!saveTimer) return;
-    clearTimeout(saveTimer);
-    saveTimer = 0;
-    Spicetify.LocalStorage.set(settingsKey(), JSON.stringify(settings));
-  }
-  function cancelSave() {
-    clearTimeout(saveTimer);
-    saveTimer = 0;
-  }
-  function stopColour(stop) {
-    return stop.kind === "theme" ? THEME_COLOUR : stop.color;
-  }
-  function isInert(s) {
-    return !s.gradient && s.stops[0].kind === "theme";
-  }
-  function update({ rerender = true } = {}) {
-    applyCss();
-    if (modal) {
-      rerender ? renderModal() : renderPreview();
-      renderPresetStates();
-    }
-    if (pendingUndo?.after && pendingUndo.after !== JSON.stringify(settings)) clearUndo();
-    afterSettingsChange();
-    saveSettings();
   }
 
   // src/gpb/render.js
@@ -1690,8 +1766,9 @@ ${OPTION_ROW_CSS.trim()}
     ],
     slide: []
   };
-  function buildCss(s) {
-    if (isInert(s)) return "";
+  function buildCss(s, reduced = reducedMotion()) {
+    const hover = hoverCss(s, reduced);
+    if (isInert(s)) return hover.length ? [...hover, ``].join("\n") : "";
     const colours = activeColours(s);
     const handle = colours[colours.length - 1];
     const spread = s.gradient ? MODE_CSS[s.mode].map((line) => `  ${line}`) : [];
@@ -1703,8 +1780,18 @@ ${OPTION_ROW_CSS.trim()}
       `${SCOPE} ${HANDLE} {`,
       `  background-color: ${handle};`,
       `}`,
+      ...hover,
       ``
     ].join("\n");
+  }
+  function hoverCss(s, reduced = reducedMotion()) {
+    if (s.hover !== "brighten") return [];
+    return [
+      ...reduced ? [] : [`${SCOPE} ${FILL} {`, `  transition: ${HOVER_TRANSITION};`, `}`],
+      `${SCOPE}:hover ${FILL} {`,
+      `  filter: ${BRIGHTEN};`,
+      `}`
+    ];
   }
   function applyCss() {
     let style = document.getElementById("gpb-style");
@@ -1721,7 +1808,7 @@ ${OPTION_ROW_CSS.trim()}
   var MODES = ["compress", "anchored", "slide"];
   var DEFAULT_MODE = "compress";
   function defaultSettings() {
-    return { version: SCHEMA_VERSION, gradient: false, mode: DEFAULT_MODE, stops: [{ id: "s1", kind: "theme" }] };
+    return { version: SCHEMA_VERSION, gradient: false, mode: DEFAULT_MODE, hover: DEFAULT_HOVER, stops: [{ id: "s1", kind: "theme" }] };
   }
   function validateSettings(data) {
     if (!data || typeof data !== "object" || data.version !== SCHEMA_VERSION) return null;
@@ -1729,6 +1816,8 @@ ${OPTION_ROW_CSS.trim()}
     if (data.stops.length < 1 || data.stops.length > MAX_STOPS) return null;
     const mode = data.mode === void 0 ? DEFAULT_MODE : data.mode;
     if (!MODES.includes(mode)) return null;
+    const hover = validHover(data.hover);
+    if (!hover) return null;
     const ids = /* @__PURE__ */ new Set();
     const stops = [];
     for (const stop of data.stops) {
@@ -1739,7 +1828,7 @@ ${OPTION_ROW_CSS.trim()}
         stops.push({ id: stop.id, kind: "custom", color: stop.color.toLowerCase() });
       else return null;
     }
-    return { version: SCHEMA_VERSION, gradient: data.gradient && stops.length > 1, mode, stops };
+    return { version: SCHEMA_VERSION, gradient: data.gradient && stops.length > 1, mode, hover, stops };
   }
   var MIGRATIONS = {};
   var GCB_CODE_PREFIX = CODE_FORMATS.gcb.prefix;
@@ -1749,7 +1838,7 @@ ${OPTION_ROW_CSS.trim()}
   }
 
   // src/gpb/ui.js
-  var OPTION_ROW_CSS = `
+  var OPTION_ROW_CSS = HOVER_ROW_CSS + `
 .gpb-spread { display: flex; flex-direction: column; gap: 8px; }
 .gpb-spread-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .gpb-modes { display: flex; gap: 2px; padding: 2px; border-radius: 500px; background-color: rgba(var(--spice-rgb-text), .1); }
@@ -1772,13 +1861,15 @@ ${OPTION_ROW_CSS.trim()}
         </div>
       </div>
       <p class="gpb-spread-hint" id="gpb-spread-hint"></p>
-    </div>`;
+    </div>` + hoverRowMarkup();
   }
   function previewMarkup() {
     return `<div class="gpb-preview"></div>`;
   }
   function extraRefs(root) {
     return {
+      ...hoverRefs(root),
+      // #3, #8
       spread: root.querySelector(".gpb-spread"),
       modes: root.querySelector(".gpb-modes"),
       modeButtons: [...root.querySelectorAll(".gpb-mode")],
@@ -1787,12 +1878,15 @@ ${OPTION_ROW_CSS.trim()}
   }
   function enableOptionRow(m) {
     enableSpread(m);
+    enableHoverRow(m);
   }
   function renderOptionRow() {
     renderSpread();
+    renderHoverRow();
   }
   function onThemeColour() {
     renderSpread();
+    renderHoverRow();
   }
   function settingsReplaced() {
   }
@@ -2199,6 +2293,101 @@ ${OPTION_ROW_CSS.trim()}
     const own = sameFileCopies(copies);
     const others = copies.filter((src) => !own.includes(src));
     return [own[0], ...others.map((src) => `also ${src}, one of them skipped by the conflict rule`)].join("; ");
+  }
+  function checkHoverSettings(check) {
+    const base = { ...defaultSettings(), gradient: true, stops: [custom("s1", RED), custom("s2", BLUE)] };
+    const legacy = { ...base };
+    delete legacy.hover;
+    const warnings = [];
+    const warn = console.warn;
+    console.warn = (...args) => warnings.push(args.join(" "));
+    let loaded;
+    try {
+      loaded = loadSettings(JSON.stringify(legacy));
+    } finally {
+      console.warn = warn;
+    }
+    check(
+      HOVER_ISSUE,
+      'Stored settings without "hover" (from before this option) load as "none", no warning',
+      loaded.hover === "none" && loaded.stops.length === 2 && !warnings.length,
+      `${loaded.hover}, ${warnings.length} warning(s)`
+    );
+    const trips = HOVER_MODES.map((hover2) => [hover2, validateSettings(JSON.parse(JSON.stringify({ ...base, hover: hover2 })))?.hover]);
+    const others = ["sparkle", "", null, 1, "glow"].filter((value) => !HOVER_MODES.includes(value));
+    const accepted = others.filter((value) => validateSettings({ ...base, hover: value }) !== null);
+    check(
+      HOVER_ISSUE,
+      `Every hover option (${HOVER_MODES.join(", ")}) round-trips through storage; anything else is invalid settings`,
+      trips.every(([hover2, back]) => hover2 === back) && !accepted.length,
+      `${trips.map(([hover2, back]) => `${hover2} → ${back}`).join(", ")}; ${accepted.length} of ${others.length} other values accepted`
+    );
+    const current = { ...base, hover: HOVER_MODES[HOVER_MODES.length - 1] };
+    const { version, hover, ...saved } = structuredClone(base);
+    const own = presetSettings({ id: "p1", name: "Mine", settings: saved }, current);
+    const builtIn = presetSettings(BUILT_IN_PRESETS[0], current);
+    const stored = loadPresets(JSON.stringify({ version: 1, presets: [{ id: "p1", name: "Mine", settings: { ...saved, hover: "brighten" } }] }));
+    check(
+      HOVER_ISSUE,
+      "Presets don't store the hover effect; applying a built-in or an own preset keeps the current one",
+      builtIn.hover === current.hover && own.hover === current.hover && stored.length === 1 && !("hover" in stored[0].settings),
+      `built-in → ${builtIn.hover}, own → ${own.hover}, stored keys ${stored[0] ? Object.keys(stored[0].settings).join(",") : "none"} (current ${current.hover})`
+    );
+    const code = encodeCode(current);
+    const body = atob(code.slice(code.indexOf(":") + 1).replace(/-/g, "+").replace(/_/g, "/"));
+    const decoded = decodeShareCode(code, current)?.settings;
+    const intoNone = decodeShareCode(code, { ...current, hover: "none" })?.settings;
+    check(
+      HOVER_ISSUE,
+      "Share codes don't carry the hover effect (format unchanged); importing one keeps the current hover effect",
+      code === encodeCode({ ...current, hover: "none" }) && !/hover|"h"/.test(body) && decoded?.hover === current.hover && intoNone?.hover === "none",
+      `${code}; imported with ${current.hover} → ${decoded?.hover}, with none → ${intoNone?.hover}`
+    );
+  }
+  async function checkHoverRow(check, m, { realClick, press, saveDelay }) {
+    const nodes = [...m.hoverButtons];
+    const shows = (hover) => settings.hover === hover && m.hoverButtons.every((b, i) => b === nodes[i] && b.isConnected && b.getAttribute("aria-checked") === "true" === (b.dataset.hover === hover) && b.tabIndex === (b.dataset.hover === hover ? 0 : -1));
+    const state = () => `hover ${settings.hover}, checked ${m.hoverButtons.filter((b) => b.getAttribute("aria-checked") === "true").map((b) => b.dataset.hover).join() || "none"}, tabindex ${m.hoverButtons.map((b) => b.tabIndex).join()}, focus ${document.activeElement?.dataset?.hover ?? document.activeElement?.className}`;
+    const style = () => document.getElementById(`${P}-style`)?.textContent ?? "";
+    check(
+      HOVER_ISSUE,
+      `Hover row: a radiogroup of ${HOVER_MODES.map((h) => HOVER_LABELS[h]).join(", ")}, labelled "Hover"; plain buttons, no <select>`,
+      m.hoverOptions.getAttribute("role") === "radiogroup" && m.hoverOptions.getAttribute("aria-labelledby") === `${P}-hover-label` && m.root.querySelector(`#${P}-hover-label`)?.textContent === "Hover" && m.hoverButtons.map((b) => b.textContent).join() === HOVER_MODES.map((h) => HOVER_LABELS[h]).join() && m.hoverButtons.every((b) => b.tagName === "BUTTON" && b.getAttribute("role") === "radio") && !m.hover.querySelector("select"),
+      state()
+    );
+    const clicks = [];
+    for (const hover of [...HOVER_MODES.slice(1), HOVER_MODES[0]]) {
+      realClick(m.hoverButtons[HOVER_MODES.indexOf(hover)]);
+      const live = hover === "none" ? !style().includes(":hover") : style().includes(":hover");
+      clicks.push(`${hover}${shows(hover) && live ? "" : ` (expected ${hover}, stylesheet ${live ? "ok" : "wrong"})`}`);
+    }
+    check(
+      HOVER_ISSUE,
+      "Clicking each hover option applies it at once (:hover rules only when it isn't None), the row updated in place",
+      !clicks.some((c) => c.includes("expected")),
+      clicks.join(", ")
+    );
+    m.hoverButtons[0].focus();
+    const last = HOVER_MODES.length - 1;
+    const keys = [];
+    for (const [key, index] of [["ArrowRight", 1], ["End", last], ["Home", 0], ["ArrowLeft", last], ["ArrowRight", 0]]) {
+      press(document.activeElement, key);
+      const want = HOVER_MODES[index];
+      keys.push(`${key} → ${settings.hover}${shows(want) && document.activeElement === m.hoverButtons[index] ? "" : ` (expected ${want} focused)`}`);
+    }
+    const altKept = press(document.activeElement, "ArrowRight", { altKey: true });
+    keys.push(`Alt+→ → ${settings.hover}${settings.hover === HOVER_MODES[0] && altKept ? "" : " (expected no change)"}`);
+    check(
+      HOVER_ISSUE,
+      "Hover keyboard: →, End, Home and ← (wrapping) change the option and move focus; Alt+→ doesn't",
+      !keys.some((k) => k.includes("expected")),
+      keys.join(", ")
+    );
+    realClick(m.hoverButtons[last]);
+    await sleep(saveDelay + 100);
+    const stored = JSON.parse(Spicetify.LocalStorage.get(settingsKey()) ?? "{}").hover;
+    realClick(m.hoverButtons[0]);
+    check(HOVER_ISSUE, "The chosen hover option is saved", stored === HOVER_MODES[last], `stored ${stored}`);
   }
   function checkEntryText(check) {
     const ISSUE = "gradient-bars#6";
@@ -3061,7 +3250,8 @@ ${OPTION_ROW_CSS.trim()}
     check(
       15,
       "Spread row sits between the Gradient row and the Presets row (#21): a radiogroup of three radio buttons",
-      m.spread.previousElementSibling === m.gradientRow && m.spread.nextElementSibling === m.presets && m.modes.getAttribute("role") === "radiogroup" && m.modes.getAttribute("aria-labelledby") === "gpb-spread-label" && m.modeButtons.length === 3 && m.modeButtons.every((b) => b.tagName === "BUTTON" && b.getAttribute("role") === "radio") && m.modeButtons.map((b) => b.textContent).join() === "Compress,Anchored,Slide",
+      m.spread.previousElementSibling === m.gradientRow && m.spread.nextElementSibling === m.hover && m.hover.nextElementSibling === m.presets && // the Hover row (#3) in between
+      m.modes.getAttribute("role") === "radiogroup" && m.modes.getAttribute("aria-labelledby") === "gpb-spread-label" && m.modeButtons.length === 3 && m.modeButtons.every((b) => b.tagName === "BUTTON" && b.getAttribute("role") === "radio") && m.modeButtons.map((b) => b.textContent).join() === "Compress,Anchored,Slide",
       `after .${m.spread.previousElementSibling?.className}, before .${m.spread.nextElementSibling?.className}, buttons ${m.modeButtons.map((b) => `${b.textContent}[${b.getAttribute("role")}]`).join(", ")}`
     );
     const menuShown = () => !m.menu.hidden && popover?.el === m.menu && m.root.contains(m.menu);
@@ -3903,6 +4093,8 @@ ${REORDER_HINT}`)),
       keySteps.join(", ")
     );
     stillOpen("changing Spread with the keyboard");
+    await checkHoverRow(check, m, { realClick, press, saveDelay: SAVE_DELAY });
+    stillOpen("changing the hover effect");
     setTestSettings(true, [custom("s1", RED), custom("s2", GREEN)], "anchored");
     const gradientSteps = [];
     const step = (label, enabled) => gradientSteps.push(`${label}: ${spreadShows("anchored", enabled) ? "ok" : `wrong (${spreadState()})`}`);
@@ -4125,7 +4317,8 @@ ${threeColours}	 `), "");
     check(
       21,
       "Presets row between Spread and the preview: label left, Export and Import right, every chip reachable",
-      m.presets.previousElementSibling === m.spread && m.presets.nextElementSibling === m.preview && Math.abs(labelRect.left - presetsRect.left) <= 1 && Math.abs(toolsRect.right - presetsRect.right) <= 1 && !unreachableChips.length,
+      m.presets.previousElementSibling === m.hover && m.hover.previousElementSibling === m.spread && m.presets.nextElementSibling === m.preview && // Hover (#3) under Spread
+      Math.abs(labelRect.left - presetsRect.left) <= 1 && Math.abs(toolsRect.right - presetsRect.right) <= 1 && !unreachableChips.length,
       `after .${m.presets.previousElementSibling?.className}, before .${m.presets.nextElementSibling?.className}; tools ${(presetsRect.right - toolsRect.right).toFixed(1)} px from the right` + (unreachableChips.length ? `; not reachable: ${unreachableChips.map((el) => el.textContent).join(", ")}` : "")
     );
     const shareButtons = [[m.exportButton, "Export", EXPORT_TITLE], [m.importButton, "Import", IMPORT_TITLE]];
@@ -4707,6 +4900,129 @@ ${threeColours}	 `), "");
       `written at once ${writtenAtOnce}, reloaded mode ${reloaded.mode}`
     );
   }
+  var HOVER = "gradient-bars#3";
+  var hoverTargets = (css) => [...css.matchAll(/([^{}]+)\{/g)].map(([, sel]) => sel.trim().replaceAll(":hover", ""));
+  function checkHoverCss(check, skip) {
+    const stops = [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)];
+    const samples = [
+      ...MODES.map((mode) => [`brighten, ${mode}`, { version: SCHEMA_VERSION, gradient: true, mode, hover: "brighten", stops }]),
+      ["brighten, solid", { version: SCHEMA_VERSION, gradient: false, mode: "compress", hover: "brighten", stops: [custom("s1", RED)] }],
+      ["brighten, inert theme colour", { ...defaultSettings(), hover: "brighten" }]
+    ];
+    const lint = samples.flatMap(([label, s]) => [false, true].flatMap((reduced2) => cssProblems(buildCss(s, reduced2), s.gradient ? s.mode : "compress").map((p) => `${label}${reduced2 ? " (reduced motion)" : ""}: ${p}`)));
+    check(
+      HOVER,
+      "Brighten passes the CSS lint in every Spread mode, solid and inert: filter only in the :hover rule, the transition only on the fill",
+      !lint.length,
+      lint.join("; ") || `${samples.length * 2} stylesheets`
+    );
+    const bright = buildCss(samples[0][1], false);
+    const reduced = buildCss(samples[0][1], true);
+    const none = buildCss({ ...samples[0][1], hover: "none" }, false);
+    const filterRules = [...bright.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(([, , body]) => body.includes("filter:")).map(([, sel]) => sel.trim());
+    check(
+      HOVER,
+      "The filter applies only under :hover; reduced motion drops the transition, not the effect; None adds nothing",
+      filterRules.length === 1 && filterRules[0] === HOVER_RULE && bright.includes(`transition: ${HOVER_TRANSITION};`) && !reduced.includes("transition") && reduced.includes(`filter: ${BRIGHTEN};`) && !/:hover|filter|transition/.test(none) && buildCss({ ...defaultSettings() }, false) === "" && buildCss({ ...defaultSettings(), hover: "brighten" }, false).includes(HOVER_RULE),
+      `filter rules: ${filterRules.join(", ") || "none"}; reduced: ${reduced.includes("transition") ? "transition kept" : "no transition"}`
+    );
+    const lintFlags = {
+      "filter outside :hover": cssProblems(`${SCOPE} ${FILL} {
+  filter: ${BRIGHTEN};
+}
+`, "compress"),
+      "another filter": cssProblems(`${HOVER_RULE} {
+  filter: blur(4px);
+}
+`, "compress"),
+      "another transition": cssProblems(`${SCOPE} ${FILL} {
+  transition: all 1s;
+}
+`, "compress"),
+      "a pseudo-element": cssProblems(`${SCOPE} .x-progressBar-progressBarBg::before {
+  background-image: none;
+}
+`, "compress"),
+      ":hover elsewhere": cssProblems(`${SCOPE}:hover ${HANDLE} {
+  background-color: red;
+}
+`, "compress")
+    };
+    const missed = Object.entries(lintFlags).filter(([, found]) => !found.length).map(([label]) => label);
+    check(
+      HOVER,
+      "The CSS lint flags a filter outside the hover rule, other filters and transitions, pseudo-elements and :hover elsewhere",
+      !missed.length,
+      missed.length ? `not flagged: ${missed.join(", ")}` : Object.values(lintFlags).map((p) => p.join("/")).join("; ")
+    );
+    const fill = document.querySelector(`${SCOPE} ${FILL}`);
+    const names = [
+      "The hover rule targets the live song bar's fill, and at rest the fill isn't filtered",
+      "The volume slider never gets the hover effect: no rule of ours applies to it",
+      "playback-bar-waveform's hover tooltip (the handle's ::before) is the same with Brighten as without our stylesheet"
+    ];
+    if (!fill) return names.forEach((name) => skip(HOVER, name, "song progress bar not found"));
+    setTestSettings(true, stops, "compress", "brighten");
+    const css = styleText();
+    const targets = hoverTargets(css);
+    const hoverTarget = HOVER_RULE.replaceAll(":hover", "");
+    const parsed = [...document.getElementById("gpb-style")?.sheet?.cssRules ?? []].map((r) => r.selectorText);
+    const transition = getComputedStyle(fill).transition;
+    check(
+      HOVER,
+      names[0],
+      document.querySelector(hoverTarget) === fill && parsed.some((sel) => sel?.includes(":hover")) && (fill.matches(":hover") || getComputedStyle(fill).filter === "none") && (reducedMotion() || transition.includes("filter")),
+      `filter at rest ${getComputedStyle(fill).filter}${fill.matches(":hover") ? " (hovered now)" : ""}; transition ${transition}`
+    );
+    const volumeFill = [...document.querySelectorAll(FILL)].find((el) => !el.closest(SCOPE));
+    if (!volumeFill) skip(HOVER, names[1], "volume slider not found");
+    else {
+      const hit = targets.filter((sel) => volumeFill.matches(sel) || [...volumeFill.parentElement.closest(".progress-bar")?.querySelectorAll("*") ?? []].some((el) => el.matches(sel)));
+      const read = () => `${getComputedStyle(volumeFill).filter} ${getComputedStyle(volumeFill).transition} ${getComputedStyle(volumeFill).backgroundImage}`;
+      const sheet = document.getElementById("gpb-style").sheet;
+      const ours = read();
+      sheet.disabled = true;
+      const spotify = read();
+      sheet.disabled = false;
+      check(HOVER, names[1], !hit.length && ours === spotify, hit.length ? `matched by ${hit.join(", ")}` : `filter, transition and image unchanged: ${ours}`);
+    }
+    const handle = document.querySelector(`${SCOPE} ${HANDLE}`);
+    if (!handle) skip(HOVER, names[2], "handle not found");
+    else {
+      const tooltip = () => {
+        const cs = getComputedStyle(handle, "::before");
+        return ["content", "display", "visibility", "filter", "position", "z-index", "transform", "color", "background-color"].map((p) => `${p} ${cs.getPropertyValue(p)}`).join("; ");
+      };
+      const touched = targets.filter((sel) => handle.matches(sel) || handle.querySelector(sel));
+      const sheet = document.getElementById("gpb-style").sheet;
+      const hit = () => {
+        const r = handle.getBoundingClientRect();
+        return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      };
+      const strip = (state) => state.replace(/background-color [^;]*/, "");
+      sheet.disabled = true;
+      const without = tooltip();
+      const hitWithout = hit();
+      sheet.disabled = false;
+      const simulated = Object.assign(document.createElement("style"), { id: "gpb-hover-probe", textContent: `${buildCss(settings, true).replaceAll(":hover", "")}${SCOPE} ${FILL} {
+  transition: none;
+}
+` });
+      document.head.append(simulated);
+      let hovered;
+      try {
+        hovered = { tooltip: tooltip(), filter: getComputedStyle(fill).filter, onTop: hit() === hitWithout };
+      } finally {
+        simulated.remove();
+      }
+      check(
+        HOVER,
+        names[2],
+        !touched.some((sel) => sel !== `${SCOPE} ${HANDLE}`) && !/::?(before|after)/.test(css) && !fill.contains(handle) && hovered.filter === BRIGHTEN && strip(hovered.tooltip) === strip(without) && hovered.onTop,
+        `${waveformActive() ? "waveform active" : "no waveform"}; simulated hover: fill ${hovered.filter}, pointer at the handle hits the same element ${hovered.onTop}, tooltip ${strip(hovered.tooltip) === strip(without) ? "unchanged" : `${hovered.tooltip} vs ${without}`}`
+      );
+    }
+  }
 
   // src/gpb/selftest.js
   var songFill = () => document.querySelector(`${SCOPE} ${FILL}`);
@@ -4729,17 +5045,22 @@ ${threeColours}	 `), "");
       })
     });
   }
-  function setTestSettings(gradient, stops, mode = DEFAULT_MODE) {
-    setSettings({ version: SCHEMA_VERSION, gradient, mode, stops: stops.map((s) => ({ ...s })) });
+  function setTestSettings(gradient, stops, mode = DEFAULT_MODE, hover = DEFAULT_HOVER) {
+    setSettings({ version: SCHEMA_VERSION, gradient, mode, hover, stops: stops.map((s) => ({ ...s })) });
     update();
   }
-  var FORBIDDEN_PROP = /^(-webkit-)?(mask(-.+)?|height|width|transform|clip-path|--progress-bar-.+|--fg-color|--bg-color|--is-active-fg-color)$/;
+  var FORBIDDEN_PROP = /^(-webkit-)?(mask(-.+)?|height|width|transform|clip-path|filter|transition(-.+)?|--progress-bar-.+|--fg-color|--bg-color|--is-active-fg-color)$/;
+  var HOVER_RULE = `${SCOPE}:hover ${FILL}`;
   function cssProblems(css, mode) {
     return lintCss(css, {
-      rule: (sel) => sel.startsWith(SCOPE) ? [] : [`unscoped rule: ${sel}`],
+      rule: (sel) => [
+        ...sel.startsWith(SCOPE) ? [] : [`unscoped rule: ${sel}`],
+        ...sel.includes("::") || /:(before|after)\b/.test(sel) ? [`pseudo-element: ${sel}`] : [],
+        ...sel.includes(":hover") && sel !== HOVER_RULE ? [`:hover outside the hover rule: ${sel}`] : []
+      ],
       declaration: (sel, name, value) => {
         const anchoredFill = mode === "anchored" && sel === `${SCOPE} ${FILL}`;
-        const allowed = anchoredFill && (name === "transform" && value === "none" || name === "clip-path");
+        const allowed = anchoredFill && (name === "transform" && value === "none" || name === "clip-path") || sel === HOVER_RULE && name === "filter" && value === BRIGHTEN || sel === `${SCOPE} ${FILL}` && name === "transition" && value === HOVER_TRANSITION;
         return FORBIDDEN_PROP.test(name) && !allowed ? `sets ${name}` : null;
       }
     });
@@ -4797,7 +5118,7 @@ ${threeColours}	 `), "");
     };
   }
   function selfTest(options) {
-    return runSelfTest(options, async ({ check }) => {
+    return runSelfTest(options, async ({ check, skip }) => {
       const env = environment();
       check(55, "The environment block reports the Spicetify version", typeof env.spicetify === "string" && !!env.spicetify, env.spicetify);
       const state = saveTestState();
@@ -4836,6 +5157,8 @@ ${threeColours}	 `), "");
         await checkEntryIcon(check);
         await checkSharedEntry(check);
         await runChecks(check, state.rootStyle, state.restoreButton);
+        checkHoverSettings(check);
+        checkHoverCss(check, skip);
       } catch (e) {
         check(23, "Self-test ran to completion", false, e?.stack || e);
       } finally {
@@ -4866,6 +5189,7 @@ ${threeColours}	 `), "");
       setPresets(loadPresets());
       window.addEventListener("beforeunload", flushSettings);
       applyCss();
+      watchReducedMotion(applyCss);
       window.__gpb = { version: VERSION, copy: COPY, status: () => statusReport(), selfTest, open: () => modal || openModal() };
       startup.entry = enableBarContextMenu();
       setShared(joinGradientBars());
@@ -4897,6 +5221,8 @@ ${threeColours}	 `), "");
   var GPB_STORAGE_KEY = "gpb:settings";
   var SCHEMA_VERSION = 2;
   var EXTRA_KEY = "textColour";
+  var HOVER_MODES = ["none", "brighten", "glow"];
+  var HOVER_ISSUE = "gradient-bars#8";
   var KEEP_NEWER_SETTINGS = true;
   var OPAQUE_ONLY = true;
   var ENTRY_LABEL = NAME;
@@ -4951,96 +5277,6 @@ ${threeColours}	 `), "");
       activeSource: entry?.active?.source ?? null,
       skipped: entry?.skipped.map((c) => `${c.copy}${c.version ? ` ${c.version}` : ""}${c.from ? ` (${c.from})` : ""}`) ?? []
     };
-  }
-
-  // src/shared/constants.js
-  var MAX_STOPS = 8;
-  var SAVE_DELAY = 250;
-  var HEX_RE = /^#[0-9a-f]{6}$/i;
-  var THEME_COLOUR = "var(--spice-button, var(--spice-text, #1db954))";
-  var PRESETS_VERSION = 1;
-  var MAX_PRESETS = 12;
-  var PRESET_NAME_MAX = 24;
-
-  // src/shared/keys.js
-  var TEST_KEYS = { settings: `${P}:selftest:settings`, presets: `${P}:selftest:presets` };
-  var testKeys = false;
-  var settingsKey = () => testKeys ? TEST_KEYS.settings : STORAGE_KEY;
-  var presetsKey = () => testKeys ? TEST_KEYS.presets : PRESETS_KEY;
-  function removeTestKeys() {
-    Spicetify.LocalStorage.remove(TEST_KEYS.settings);
-    Spicetify.LocalStorage.remove(TEST_KEYS.presets);
-  }
-  function useTestKeys(on) {
-    if (on) {
-      for (const [real, test] of [[STORAGE_KEY, TEST_KEYS.settings], [PRESETS_KEY, TEST_KEYS.presets]]) {
-        const value = Spicetify.LocalStorage.get(real);
-        if (value == null) Spicetify.LocalStorage.remove(test);
-        else Spicetify.LocalStorage.set(test, value);
-      }
-    }
-    testKeys = on;
-    if (!on) removeTestKeys();
-  }
-
-  // src/shared/clipboard.js
-  var CLIPBOARD_TIMEOUT_MS = 1500;
-  var copyContainer = () => document.body;
-  function setCopyContainer(container) {
-    copyContainer = container;
-  }
-  var clipboardSources = {
-    // where the tiers come from; the self-test swaps these for stubs
-    api: () => window.Spicetify?.Platform?.ClipboardAPI,
-    clipboard: () => navigator.clipboard,
-    execCommand: (command) => document.execCommand(command)
-  };
-  async function writeClipboard(text) {
-    const settle = (promise) => Promise.race([
-      promise,
-      new Promise((_, reject) => setTimeout(() => reject(new Error("clipboard timeout")), CLIPBOARD_TIMEOUT_MS))
-    ]);
-    const asyncTiers = [
-      ["ClipboardAPI", () => {
-        const clipboardApi = clipboardSources.api();
-        if (typeof clipboardApi?.copy !== "function") throw new Error("no ClipboardAPI");
-        return clipboardApi.copy(text);
-      }],
-      ["writeText", () => {
-        const clipboard = clipboardSources.clipboard();
-        if (typeof clipboard?.writeText !== "function") throw new Error("no clipboard");
-        return clipboard.writeText(text);
-      }]
-    ];
-    for (const [name, write] of asyncTiers) {
-      try {
-        await settle(Promise.resolve().then(write));
-        return name;
-      } catch {
-      }
-    }
-    return execCommandCopy(text) ? "execCommand" : null;
-  }
-  function execCommandCopy(text) {
-    const buffer = document.createElement("textarea");
-    buffer.className = `${P}-copy-buffer`;
-    buffer.value = text;
-    buffer.readOnly = true;
-    buffer.tabIndex = -1;
-    buffer.setAttribute("aria-hidden", "true");
-    Object.assign(buffer.style, { position: "fixed", top: "0", left: "0", width: "1px", height: "1px", padding: "0", border: "0", opacity: "0", pointerEvents: "none" });
-    const focused = document.activeElement;
-    copyContainer().append(buffer);
-    buffer.focus({ preventScroll: true });
-    buffer.select();
-    let copied = false;
-    try {
-      copied = clipboardSources.execCommand("copy") === true;
-    } catch {
-    }
-    buffer.remove();
-    if (focused?.isConnected && focused !== document.body) focused.focus({ preventScroll: true });
-    return copied;
   }
 
   // src/shared/colour.js
@@ -5115,6 +5351,248 @@ ${threeColours}	 `), "");
     return (hi + 0.05) / (lo + 0.05);
   }
 
+  // src/shared/clipboard.js
+  var CLIPBOARD_TIMEOUT_MS = 1500;
+  var copyContainer = () => document.body;
+  function setCopyContainer(container) {
+    copyContainer = container;
+  }
+  var clipboardSources = {
+    // where the tiers come from; the self-test swaps these for stubs
+    api: () => window.Spicetify?.Platform?.ClipboardAPI,
+    clipboard: () => navigator.clipboard,
+    execCommand: (command) => document.execCommand(command)
+  };
+  async function writeClipboard(text) {
+    const settle = (promise) => Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("clipboard timeout")), CLIPBOARD_TIMEOUT_MS))
+    ]);
+    const asyncTiers = [
+      ["ClipboardAPI", () => {
+        const clipboardApi = clipboardSources.api();
+        if (typeof clipboardApi?.copy !== "function") throw new Error("no ClipboardAPI");
+        return clipboardApi.copy(text);
+      }],
+      ["writeText", () => {
+        const clipboard = clipboardSources.clipboard();
+        if (typeof clipboard?.writeText !== "function") throw new Error("no clipboard");
+        return clipboard.writeText(text);
+      }]
+    ];
+    for (const [name, write] of asyncTiers) {
+      try {
+        await settle(Promise.resolve().then(write));
+        return name;
+      } catch {
+      }
+    }
+    return execCommandCopy(text) ? "execCommand" : null;
+  }
+  function execCommandCopy(text) {
+    const buffer = document.createElement("textarea");
+    buffer.className = `${P}-copy-buffer`;
+    buffer.value = text;
+    buffer.readOnly = true;
+    buffer.tabIndex = -1;
+    buffer.setAttribute("aria-hidden", "true");
+    Object.assign(buffer.style, { position: "fixed", top: "0", left: "0", width: "1px", height: "1px", padding: "0", border: "0", opacity: "0", pointerEvents: "none" });
+    const focused = document.activeElement;
+    copyContainer().append(buffer);
+    buffer.focus({ preventScroll: true });
+    buffer.select();
+    let copied = false;
+    try {
+      copied = clipboardSources.execCommand("copy") === true;
+    } catch {
+    }
+    buffer.remove();
+    if (focused?.isConnected && focused !== document.body) focused.focus({ preventScroll: true });
+    return copied;
+  }
+
+  // src/shared/constants.js
+  var MAX_STOPS = 8;
+  var SAVE_DELAY = 250;
+  var HEX_RE = /^#[0-9a-f]{6}$/i;
+  var THEME_COLOUR = "var(--spice-button, var(--spice-text, #1db954))";
+  var PRESETS_VERSION = 1;
+  var MAX_PRESETS = 12;
+  var PRESET_NAME_MAX = 24;
+
+  // src/shared/keys.js
+  var TEST_KEYS = { settings: `${P}:selftest:settings`, presets: `${P}:selftest:presets` };
+  var testKeys = false;
+  var settingsKey = () => testKeys ? TEST_KEYS.settings : STORAGE_KEY;
+  var presetsKey = () => testKeys ? TEST_KEYS.presets : PRESETS_KEY;
+  function removeTestKeys() {
+    Spicetify.LocalStorage.remove(TEST_KEYS.settings);
+    Spicetify.LocalStorage.remove(TEST_KEYS.presets);
+  }
+  function useTestKeys(on) {
+    if (on) {
+      for (const [real, test] of [[STORAGE_KEY, TEST_KEYS.settings], [PRESETS_KEY, TEST_KEYS.presets]]) {
+        const value = Spicetify.LocalStorage.get(real);
+        if (value == null) Spicetify.LocalStorage.remove(test);
+        else Spicetify.LocalStorage.set(test, value);
+      }
+    }
+    testKeys = on;
+    if (!on) removeTestKeys();
+  }
+
+  // src/shared/codes.js
+  var CODE_FORMATS = {
+    gpb: { prefix: "gpb1:", field: "m", key: "mode", codes: { compress: "c", anchored: "a", slide: "s" } },
+    gcb: { prefix: "gcb1:", field: "x", key: "textColour", codes: { auto: "a", black: "b", white: "w", default: "d" } }
+  };
+  var OWN_FORMAT = CODE_FORMATS[P];
+  var CODE_PREFIX = OWN_FORMAT.prefix;
+  var toBase64Url = (data) => btoa(JSON.stringify(data)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  function encodeCode(s) {
+    return CODE_PREFIX + toBase64Url({
+      g: s.gradient ? 1 : 0,
+      [OWN_FORMAT.field]: OWN_FORMAT.codes[s[EXTRA_KEY]],
+      s: s.stops.map((stop) => stop.kind === "theme" ? "t" : stop.color.slice(1))
+    });
+  }
+  function decodeShareCode(text, current = settings) {
+    const code = String(text ?? "").trim();
+    const from = Object.keys(CODE_FORMATS).find((id) => code.startsWith(CODE_FORMATS[id].prefix));
+    const format = CODE_FORMATS[from];
+    const body = format ? code.slice(format.prefix.length) : "";
+    if (!format || !/^[A-Za-z0-9_-]+$/.test(body)) return null;
+    let data = null;
+    try {
+      data = JSON.parse(atob(body.replace(/-/g, "+").replace(/_/g, "/")));
+    } catch {
+      return null;
+    }
+    if (!data || typeof data !== "object" || !Array.isArray(data.s)) return null;
+    const foreign = format !== OWN_FORMAT;
+    if (foreign && !Object.values(format.codes).includes(data[format.field])) return null;
+    const extra = foreign ? current[EXTRA_KEY] : Object.keys(format.codes).find((key) => format.codes[key] === data[format.field]) ?? null;
+    const valid = validateSettings({
+      version: SCHEMA_VERSION,
+      gradient: data.g === 1 ? true : data.g === 0 ? false : null,
+      [EXTRA_KEY]: extra,
+      hover: current.hover,
+      // not in codes (#3, #8): an import keeps the current hover effect
+      stops: data.s.map(
+        (value, i) => value === "t" ? { id: `s${i + 1}`, kind: "theme" } : { id: `s${i + 1}`, kind: "custom", color: typeof value === "string" ? `#${value}` : null }
+      )
+    });
+    return valid && { settings: valid, from };
+  }
+
+  // src/shared/presets.js
+  var BUILT_IN_PRESETS = [
+    { id: "b:void", name: "Void", colours: ["#8372fd", "#5a82ff", "#8372fd"] },
+    { id: "b:sunset", name: "Sunset", colours: ["#6e33ff", "#ff5f6d", "#ffc371"] },
+    { id: "b:aurora", name: "Aurora", colours: ["#00f5a0", "#00d9f5", "#7f5af0"] },
+    { id: "b:neon", name: "Neon", colours: ["#ff00cc", "#3333ff", "#33f7ff"] },
+    { id: "b:fairy", name: "Fairy", colours: ["#ff59d1", "#ffb800", "#77bc00"] }
+  ].map((preset) => ({ ...preset, builtIn: true }));
+  var presets = [];
+  function setPresets(next) {
+    presets = next;
+  }
+  function snapshot(s) {
+    return { gradient: s.gradient, [EXTRA_KEY]: s[EXTRA_KEY], stops: s.stops.map((stop) => ({ ...stop })) };
+  }
+  function presetSettings(preset, current = settings) {
+    if (!preset.builtIn) return { version: SCHEMA_VERSION, ...structuredClone(preset.settings), hover: current.hover };
+    const stops = preset.colours.map((color, i) => ({ id: `s${i + 1}`, kind: "custom", color }));
+    return { version: SCHEMA_VERSION, gradient: true, [EXTRA_KEY]: current[EXTRA_KEY], hover: current.hover, stops };
+  }
+  function sameSettings(a, b) {
+    return a.gradient === b.gradient && a[EXTRA_KEY] === b[EXTRA_KEY] && a.stops.length === b.stops.length && a.stops.every((stop, i) => stop.kind === b.stops[i].kind && stop.color === b.stops[i].color);
+  }
+  var matchesPreset = (preset, s = settings) => sameSettings(s, presetSettings(preset, s));
+  var presetById = (id) => BUILT_IN_PRESETS.find((p) => p.id === id) ?? presets.find((p) => p.id === id) ?? null;
+  function validatePreset(entry) {
+    if (!entry || typeof entry !== "object" || typeof entry.id !== "string" || !entry.id || typeof entry.name !== "string")
+      return null;
+    const name = entry.name.trim();
+    if (!name || name.length > PRESET_NAME_MAX) return null;
+    const valid = validateSettings({ ...entry.settings, version: SCHEMA_VERSION });
+    return valid && { id: entry.id, name, settings: snapshot(valid) };
+  }
+  function loadPresets(raw = Spicetify.LocalStorage.get(presetsKey())) {
+    if (raw == null) return [];
+    let data = null;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+    }
+    if (!data || data.version !== PRESETS_VERSION || !Array.isArray(data.presets)) {
+      console.warn(`[${P}] Saved presets were unreadable and have been ignored.`);
+      return [];
+    }
+    const list = [];
+    for (const entry of data.presets) {
+      const preset = validatePreset(entry);
+      if (!preset || list.length >= MAX_PRESETS || list.some((p) => p.id === preset.id)) continue;
+      preset.name = uniqueName(preset.name, list);
+      list.push(preset);
+    }
+    const dropped = data.presets.length - list.length;
+    if (dropped) console.warn(`[${P}] ${dropped} saved preset${dropped === 1 ? " was" : "s were"} invalid and dropped.`);
+    return list;
+  }
+  function savePresets() {
+    Spicetify.LocalStorage.set(presetsKey(), JSON.stringify({ version: PRESETS_VERSION, presets }));
+  }
+  function uniqueName(name, list = presets, exceptId = null) {
+    const base = name.trim().slice(0, PRESET_NAME_MAX);
+    const taken = new Set([...BUILT_IN_PRESETS, ...list].filter((p) => p.id !== exceptId).map((p) => p.name.toLowerCase()));
+    if (!taken.has(base.toLowerCase())) return base;
+    for (let n = 2; ; n++) {
+      const suffix = ` (${n})`;
+      const candidate = base.slice(0, PRESET_NAME_MAX - suffix.length).trimEnd() + suffix;
+      if (!taken.has(candidate.toLowerCase())) return candidate;
+    }
+  }
+  var defaultPresetName = () => uniqueName(`Preset ${presets.length + 1}`);
+  function nextPresetId() {
+    const ids = new Set(presets.map((p) => p.id));
+    let n = 1;
+    while (ids.has(`p${n}`)) n++;
+    return `p${n}`;
+  }
+  function addPreset(name) {
+    if (presets.length >= MAX_PRESETS) return null;
+    const preset = { id: nextPresetId(), name: uniqueName(name.trim() || defaultPresetName()), settings: snapshot(settings) };
+    presets.push(preset);
+    savePresets();
+    return preset;
+  }
+  function renamePreset(id, name) {
+    const preset = presets.find((p) => p.id === id);
+    if (!preset || !name.trim()) return false;
+    preset.name = uniqueName(name, presets, id);
+    savePresets();
+    return true;
+  }
+  function updatePreset(id) {
+    const preset = presets.find((p) => p.id === id);
+    if (!preset) return false;
+    preset.settings = snapshot(settings);
+    savePresets();
+    return true;
+  }
+  function deletePreset(id) {
+    const index = presets.findIndex((p) => p.id === id);
+    if (index === -1) return null;
+    const [preset] = presets.splice(index, 1);
+    savePresets();
+    return { preset, index };
+  }
+  function restorePreset({ preset, index }) {
+    presets.splice(Math.min(index, presets.length), 0, preset);
+    savePresets();
+  }
+
   // src/shared/stops.js
   var selectedId = null;
   function setSelectedId(id) {
@@ -5180,6 +5658,433 @@ ${threeColours}	 `), "");
     stop.kind = "theme";
     delete stop.color;
     update({ rerender: false });
+  }
+
+  // src/shared/reset.js
+  var RESET_CONFIRM_MS = 3e3;
+  var RESET_CONFIRM_LABEL = "Confirm reset?";
+  function enableReset(m) {
+    const button = m.resetButton;
+    let timer = 0;
+    const armed = () => button.classList.contains(`${P}-armed`);
+    const disarm = () => {
+      clearTimeout(timer);
+      timer = 0;
+      button.classList.remove(`${P}-armed`);
+      m.resetLabel.textContent = "Reset";
+    };
+    button.addEventListener("click", () => {
+      if (armed()) {
+        disarm();
+        resetSettings();
+        return;
+      }
+      button.classList.add(`${P}-armed`);
+      m.resetLabel.textContent = RESET_CONFIRM_LABEL;
+      timer = setTimeout(disarm, RESET_CONFIRM_MS);
+    });
+    button.addEventListener("blur", () => armed() && disarm());
+    disarmOnOutsideInput(m, () => armed() ? button : null, disarm);
+    m.cleanups.push(disarm);
+  }
+  function disarmOnOutsideInput(m, armedEl, disarm) {
+    const listen = (type, handler) => {
+      document.addEventListener(type, handler, true);
+      m.cleanups.push(() => document.removeEventListener(type, handler, true));
+    };
+    const elsewhere = (e) => {
+      const el = armedEl();
+      if (el && !el.contains(e.target)) disarm();
+    };
+    listen("pointerdown", elsewhere);
+    listen("click", elsewhere);
+    listen("keydown", (e) => {
+      const el = armedEl();
+      if (!el) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        disarm();
+      } else if (!el.contains(e.target)) disarm();
+    });
+  }
+
+  // src/shared/presets-ui.js
+  var UNDO_MS = 1e4;
+  var APPLY_LABEL = "Apply?";
+  var SAVE_LABEL = "Save the current settings as a preset";
+  var SAVE_FULL_LABEL = `Up to ${MAX_PRESETS} presets`;
+  var OWN_PRESET_HINT = "Right-click to rename, update or delete";
+  var chipEl = (id) => modal?.chips.querySelector(`.${P}-preset-chip[data-preset="${CSS.escape(id)}"]`) ?? null;
+  var isOwnPreset = (id) => presets.some((p) => p.id === id);
+  function enablePresets(m) {
+    m.chips.addEventListener("click", (e) => {
+      const chip = e.target.closest(`.${P}-chip`);
+      if (!chip || chip.disabled) return;
+      if (chip === m.saveChip) startNaming(m, "save");
+      else clickChip(m, chip);
+    });
+    m.chips.addEventListener("contextmenu", (e) => {
+      const chip = e.target.closest(`.${P}-preset-chip`);
+      if (!chip || !isOwnPreset(chip.dataset.preset)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const id = chip.dataset.preset;
+      if (popover?.id === id && performance.now() - popover.openedAt < 500) return;
+      const r = chip.getBoundingClientRect();
+      const onChip = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      openChipMenu(id, onChip ? { at: { x: e.clientX, y: e.clientY } } : { keyboard: true });
+    });
+    m.chips.addEventListener("keydown", (e) => {
+      const chip = e.target.closest(`.${P}-preset-chip`);
+      if (!chip || !isOwnPreset(chip.dataset.preset) || !(e.key === "ContextMenu" || e.shiftKey && e.key === "F10")) return;
+      e.preventDefault();
+      openChipMenu(chip.dataset.preset, { keyboard: true });
+    });
+    m.chips.addEventListener("focusout", (e) => m.armed?.chip === e.target && disarmChip(m));
+    disarmOnOutsideInput(m, () => m.armed?.chip ?? null, () => disarmChip(m));
+    m.nameField.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        stopNaming(m, { commit: true });
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        stopNaming(m, { refocus: true });
+      }
+    });
+    m.nameField.addEventListener("blur", () => stopNaming(m));
+    m.renameItem.addEventListener("click", () => runChipAction((id) => startNaming(m, "rename", id)));
+    m.updatePresetItem.addEventListener(
+      "click",
+      () => runChipAction((id) => {
+        if (pendingUndo?.kind === "preset") clearUndo();
+        if (updatePreset(id)) renderChipsLater(m, id);
+      })
+    );
+    m.deletePresetItem.addEventListener("click", () => runChipAction((id) => deleteWithUndo(m, id)));
+    m.undoButton.addEventListener("click", runUndo);
+    enableSharing(m);
+    m.cleanups.push(() => {
+      disarmChip(m);
+      clearUndo();
+    });
+  }
+  var EXPORT_TITLE = "Copy a share code to the clipboard";
+  var EXPORT_LABEL = "Export";
+  var COPIED_LABEL = "Copied";
+  var COPIED_MS = 2e3;
+  var COPY_HINT = /Mac/i.test(navigator.platform) ? "Press ⌘C to copy" : "Press Ctrl+C to copy";
+  var IMPORT_ERROR = "Not a valid code";
+  var PREVIEW_CODE_MESSAGE = "Previewing code — Apply to use it";
+  function enableSharing(m) {
+    m.exportButton.addEventListener("click", () => copyCode(m));
+    m.codeOutput.addEventListener("blur", () => m.codeFallback.hidden = true);
+    m.importButton.addEventListener("click", () => toggleImport(m));
+    m.importApply.addEventListener("click", () => importCode(m));
+    m.codeInput.addEventListener("input", () => {
+      setImportError(m, false);
+      renderPreview();
+      renderStatus();
+    });
+    m.codeInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        importCode(m);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleImport(m, false);
+        m.importButton.focus({ preventScroll: true });
+      }
+    });
+    m.cleanups.push(() => clearTimeout(m.copiedTimer));
+  }
+  async function copyCode(m) {
+    const code = encodeCode(settings);
+    const tier = await writeClipboard(code);
+    if (modal !== m) return tier;
+    showExportCopied(m, !!tier);
+    if (!tier) {
+      m.codeOutput.value = code;
+      m.codeFallback.hidden = false;
+      m.codeOutput.focus({ preventScroll: true });
+      m.codeOutput.select();
+      return null;
+    }
+    m.codeFallback.hidden = true;
+    m.announce.textContent = "Share code copied";
+    return tier;
+  }
+  function showExportCopied(m, copied) {
+    clearTimeout(m.copiedTimer);
+    m.exportLabel.textContent = copied ? COPIED_LABEL : EXPORT_LABEL;
+    m.exportIcon.toggleAttribute("hidden", copied);
+    m.exportCheck.toggleAttribute("hidden", !copied);
+    if (copied) m.copiedTimer = setTimeout(() => showExportCopied(m, false), COPIED_MS);
+  }
+  function toggleImport(m, open = m.importPanel.hidden) {
+    m.importPanel.hidden = !open;
+    m.importButton.setAttribute("aria-expanded", String(open));
+    if (open) {
+      m.codeInput.value = "";
+      setImportError(m, false);
+      m.codeInput.focus({ preventScroll: true });
+    }
+    if (modal !== m) return;
+    renderPreview();
+    renderStatus();
+  }
+  function setImportError(m, invalid) {
+    if (invalid) m.codeInput.setAttribute("aria-invalid", "true");
+    else m.codeInput.removeAttribute("aria-invalid");
+    m.importError.textContent = invalid ? IMPORT_ERROR : "";
+  }
+  function importCode(m) {
+    const decoded = decodeShareCode(m.codeInput.value);
+    if (!decoded) {
+      setImportError(m, true);
+      return false;
+    }
+    toggleImport(m, false);
+    m.importButton.focus({ preventScroll: true });
+    applySettings(decoded.settings, IMPORTED[decoded.from], m.importButton);
+    return true;
+  }
+  function clickChip(m, chip) {
+    const preset = presetById(chip.dataset.preset);
+    if (!preset || matchesPreset(preset)) return;
+    if (m.armed?.chip !== chip) return armChip(m, chip, preset);
+    disarmChip(m);
+    applySettings(presetSettings(preset), `Applied "${preset.name}"`, chip);
+  }
+  function armChip(m, chip, preset) {
+    disarmChip(m);
+    chip.classList.add(`${P}-armed`);
+    chip.querySelector(`.${P}-chip-label`).textContent = APPLY_LABEL;
+    chip.setAttribute("aria-label", `Apply "${preset.name}"?`);
+    m.armed = { chip, name: preset.name, settings: presetSettings(preset) };
+    renderPreview();
+    renderStatus();
+  }
+  function disarmChip(m) {
+    if (!m.armed) return;
+    const { chip } = m.armed;
+    m.armed = null;
+    const name = presetById(chip.dataset.preset)?.name ?? "";
+    chip.classList.remove(`${P}-armed`);
+    chip.querySelector(`.${P}-chip-label`).textContent = name;
+    chip.setAttribute("aria-label", name);
+    if (modal !== m) return;
+    renderPreview();
+    renderStatus();
+  }
+  function previewing(m) {
+    if (m.armed) return { settings: m.armed.settings, message: `Previewing "${m.armed.name}" — click it again to apply, Esc to cancel` };
+    const code = m.importPanel.hidden ? null : decodeShareCode(m.codeInput.value);
+    return code && { settings: code.settings, message: PREVIEW_CODE_MESSAGE };
+  }
+  function applySettings(next, message, focusAfterUndo = null) {
+    const previous = structuredClone(settings);
+    setSettings(next);
+    setSelectedId(settings.stops[0].id);
+    settingsReplaced();
+    update();
+    offerUndo(message, (hadFocus) => {
+      setSettings(previous);
+      setSelectedId(previous.stops[0].id);
+      settingsReplaced();
+      update();
+      if (hadFocus && focusAfterUndo?.isConnected) focusAfterUndo.focus({ preventScroll: true });
+    }, { trackSettings: true });
+  }
+  function deleteWithUndo(m, id) {
+    const removed = deletePreset(id);
+    if (!removed) return;
+    renderChipsLater(m, (presets[removed.index] ?? presets[removed.index - 1])?.id ?? "save");
+    offerUndo(`Deleted "${removed.preset.name}"`, (hadFocus) => {
+      restorePreset(removed);
+      renderChipsLater(m, hadFocus ? removed.preset.id : null);
+    }, { kind: "preset" });
+  }
+  var pendingUndo = null;
+  function offerUndo(message, restore, { trackSettings = false, kind = "settings" } = {}) {
+    clearUndo();
+    const after = trackSettings ? JSON.stringify(settings) : null;
+    pendingUndo = { message, kind, restore, after, timer: setTimeout(clearUndo, UNDO_MS) };
+    renderStatus();
+  }
+  function clearUndo() {
+    if (!pendingUndo) return;
+    clearTimeout(pendingUndo.timer);
+    pendingUndo = null;
+    renderStatus();
+  }
+  function runUndo() {
+    const undo = pendingUndo;
+    if (!undo) return;
+    const hadFocus = !!modal && document.activeElement === modal.undoButton;
+    clearUndo();
+    undo.restore(hadFocus);
+  }
+  function renderStatus() {
+    if (!modal) return;
+    const preview = previewing(modal);
+    const undo = !preview && pendingUndo;
+    modal.undoLine.classList.toggle(`${P}-has-status`, !!(preview || undo));
+    modal.undoText.textContent = preview ? preview.message : undo ? `${undo.message} · ` : "";
+    modal.undoButton.hidden = !undo;
+  }
+  function renderChips(m) {
+    disarmChip(m);
+    if (!m.naming) m.saveChip.after(m.nameField);
+    for (const chip of m.chips.querySelectorAll(`.${P}-preset-chip`)) chip.remove();
+    m.builtInRow.append(...BUILT_IN_PRESETS.map(presetChip));
+    for (const preset of presets) m.saveChip.before(presetChip(preset));
+    const full = presets.length >= MAX_PRESETS;
+    m.saveChip.disabled = full;
+    m.saveChip.title = full ? SAVE_FULL_LABEL : SAVE_LABEL;
+    renderPresetStates();
+  }
+  function renderChipsLater(m, focusId = null) {
+    closePopover();
+    disarmChip(m);
+    setTimeout(() => {
+      if (modal !== m) return;
+      renderChips(m);
+      const target = focusId === "save" ? m.saveChip : focusId ? chipEl(focusId) : null;
+      target?.focus({ preventScroll: true });
+    }, 0);
+  }
+  function presetChip(preset) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = `${P}-chip ${P}-preset-chip`;
+    chip.dataset.preset = preset.id;
+    chip.setAttribute("aria-pressed", "false");
+    chip.setAttribute("aria-label", preset.name);
+    chip.title = preset.builtIn ? preset.name : `${preset.name}
+${OWN_PRESET_HINT}`;
+    chip.innerHTML = `<span class="${P}-chip-swatch" aria-hidden="true"></span><span class="${P}-chip-text"><span class="${P}-chip-label" aria-live="polite"></span><span class="${P}-sizer" aria-hidden="true"></span><span class="${P}-sizer" aria-hidden="true">${APPLY_LABEL}</span></span>`;
+    chip.querySelector(`.${P}-chip-swatch`).style.backgroundImage = previewImage(presetSettings(preset));
+    chip.querySelector(`.${P}-chip-label`).textContent = preset.name;
+    chip.querySelector(`.${P}-sizer`).textContent = preset.name;
+    return chip;
+  }
+  function renderPresetStates() {
+    if (!modal) return;
+    for (const chip of modal.chips.querySelectorAll(`.${P}-preset-chip`)) {
+      const preset = presetById(chip.dataset.preset);
+      chip.setAttribute("aria-pressed", String(!!preset && matchesPreset(preset)));
+    }
+  }
+  function startNaming(m, mode, id = null) {
+    if (m.naming) return;
+    const preset = mode === "rename" ? presets.find((p) => p.id === id) : null;
+    const chip = mode === "rename" ? chipEl(id) : m.saveChip;
+    if (!chip || mode === "rename" && !preset) return;
+    disarmChip(m);
+    m.naming = { mode, id, chip };
+    chip.before(m.nameField);
+    chip.hidden = true;
+    m.nameField.value = preset ? preset.name : defaultPresetName();
+    m.nameField.setAttribute("aria-label", preset ? `New name for "${preset.name}"` : "Preset name");
+    m.nameField.hidden = false;
+    m.nameField.focus({ preventScroll: true });
+    m.nameField.select();
+  }
+  function stopNaming(m, { commit = false, refocus = false } = {}) {
+    const naming = m.naming;
+    if (!naming) return;
+    m.naming = null;
+    m.nameField.hidden = true;
+    m.saveChip.after(m.nameField);
+    naming.chip.hidden = false;
+    if (!commit) {
+      if (refocus) naming.chip.focus({ preventScroll: true });
+      return;
+    }
+    if (pendingUndo?.kind === "preset") clearUndo();
+    if (naming.mode === "save") renderChipsLater(m, addPreset(m.nameField.value)?.id ?? "save");
+    else {
+      renamePreset(naming.id, m.nameField.value);
+      renderChipsLater(m, naming.id);
+    }
+  }
+  function openChipMenu(id, { at = null, keyboard = false } = {}) {
+    const anchor = chipEl(id);
+    if (!anchor || !isOwnPreset(id)) return;
+    disarmChip(modal);
+    setMenuKind("chip");
+    if (showPopover(id, modal.menu, at, anchor) && keyboard) menuItems()[0]?.focus({ preventScroll: true });
+  }
+  function runChipAction(action) {
+    if (!popover) return;
+    const { id } = popover;
+    closePopover();
+    action(id);
+  }
+
+  // src/shared/settings.js
+  var settings;
+  function setSettings(next) {
+    settings = next;
+  }
+  function migrate(data) {
+    let current = data;
+    while (current && typeof current === "object" && Number.isInteger(current.version) && current.version < SCHEMA_VERSION && typeof MIGRATIONS[current.version] === "function") {
+      current = MIGRATIONS[current.version](structuredClone(current));
+    }
+    return current;
+  }
+  function loadSettings(raw = Spicetify.LocalStorage.get(settingsKey())) {
+    if (raw == null) return defaultSettings();
+    let data = null;
+    try {
+      data = migrate(JSON.parse(raw));
+    } catch {
+    }
+    const valid = validateSettings(data);
+    if (valid) return valid;
+    if (KEEP_NEWER_SETTINGS && Number.isInteger(data?.version) && data.version > SCHEMA_VERSION) {
+      console.warn(`[${P}] Saved settings are from a newer version of the extension; using defaults.`);
+      return defaultSettings();
+    }
+    console.warn(`[${P}] Saved settings were invalid and have been reset to defaults.`);
+    const defaults = defaultSettings();
+    Spicetify.LocalStorage.set(settingsKey(), JSON.stringify(defaults));
+    return defaults;
+  }
+  var saveTimer = 0;
+  function saveSettings() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flushSettings, SAVE_DELAY);
+  }
+  function flushSettings() {
+    if (!saveTimer) return;
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+    Spicetify.LocalStorage.set(settingsKey(), JSON.stringify(settings));
+  }
+  function cancelSave() {
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+  }
+  function stopColour(stop) {
+    return stop.kind === "theme" ? THEME_COLOUR : stop.color;
+  }
+  function isInert(s) {
+    return !s.gradient && s.stops[0].kind === "theme";
+  }
+  function update({ rerender = true } = {}) {
+    applyCss();
+    if (modal) {
+      rerender ? renderModal() : renderPreview();
+      renderPresetStates();
+    }
+    if (pendingUndo?.after && pendingUndo.after !== JSON.stringify(settings)) clearUndo();
+    afterSettingsChange();
+    saveSettings();
   }
 
   // src/shared/stop-editor.js
@@ -5593,521 +6498,6 @@ ${REORDER_HINT}` : "");
     });
   }
 
-  // src/shared/codes.js
-  var CODE_FORMATS = {
-    gpb: { prefix: "gpb1:", field: "m", key: "mode", codes: { compress: "c", anchored: "a", slide: "s" } },
-    gcb: { prefix: "gcb1:", field: "x", key: "textColour", codes: { auto: "a", black: "b", white: "w", default: "d" } }
-  };
-  var OWN_FORMAT = CODE_FORMATS[P];
-  var CODE_PREFIX = OWN_FORMAT.prefix;
-  var toBase64Url = (data) => btoa(JSON.stringify(data)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  function encodeCode(s) {
-    return CODE_PREFIX + toBase64Url({
-      g: s.gradient ? 1 : 0,
-      [OWN_FORMAT.field]: OWN_FORMAT.codes[s[EXTRA_KEY]],
-      s: s.stops.map((stop) => stop.kind === "theme" ? "t" : stop.color.slice(1))
-    });
-  }
-  function decodeShareCode(text, current = settings) {
-    const code = String(text ?? "").trim();
-    const from = Object.keys(CODE_FORMATS).find((id) => code.startsWith(CODE_FORMATS[id].prefix));
-    const format = CODE_FORMATS[from];
-    const body = format ? code.slice(format.prefix.length) : "";
-    if (!format || !/^[A-Za-z0-9_-]+$/.test(body)) return null;
-    let data = null;
-    try {
-      data = JSON.parse(atob(body.replace(/-/g, "+").replace(/_/g, "/")));
-    } catch {
-      return null;
-    }
-    if (!data || typeof data !== "object" || !Array.isArray(data.s)) return null;
-    const foreign = format !== OWN_FORMAT;
-    if (foreign && !Object.values(format.codes).includes(data[format.field])) return null;
-    const extra = foreign ? current[EXTRA_KEY] : Object.keys(format.codes).find((key) => format.codes[key] === data[format.field]) ?? null;
-    const valid = validateSettings({
-      version: SCHEMA_VERSION,
-      gradient: data.g === 1 ? true : data.g === 0 ? false : null,
-      [EXTRA_KEY]: extra,
-      stops: data.s.map(
-        (value, i) => value === "t" ? { id: `s${i + 1}`, kind: "theme" } : { id: `s${i + 1}`, kind: "custom", color: typeof value === "string" ? `#${value}` : null }
-      )
-    });
-    return valid && { settings: valid, from };
-  }
-
-  // src/shared/presets.js
-  var BUILT_IN_PRESETS = [
-    { id: "b:void", name: "Void", colours: ["#8372fd", "#5a82ff", "#8372fd"] },
-    { id: "b:sunset", name: "Sunset", colours: ["#6e33ff", "#ff5f6d", "#ffc371"] },
-    { id: "b:aurora", name: "Aurora", colours: ["#00f5a0", "#00d9f5", "#7f5af0"] },
-    { id: "b:neon", name: "Neon", colours: ["#ff00cc", "#3333ff", "#33f7ff"] },
-    { id: "b:fairy", name: "Fairy", colours: ["#ff59d1", "#ffb800", "#77bc00"] }
-  ].map((preset) => ({ ...preset, builtIn: true }));
-  var presets = [];
-  function setPresets(next) {
-    presets = next;
-  }
-  function snapshot(s) {
-    return { gradient: s.gradient, [EXTRA_KEY]: s[EXTRA_KEY], stops: s.stops.map((stop) => ({ ...stop })) };
-  }
-  function presetSettings(preset, current = settings) {
-    if (!preset.builtIn) return { version: SCHEMA_VERSION, ...structuredClone(preset.settings) };
-    const stops = preset.colours.map((color, i) => ({ id: `s${i + 1}`, kind: "custom", color }));
-    return { version: SCHEMA_VERSION, gradient: true, [EXTRA_KEY]: current[EXTRA_KEY], stops };
-  }
-  function sameSettings(a, b) {
-    return a.gradient === b.gradient && a[EXTRA_KEY] === b[EXTRA_KEY] && a.stops.length === b.stops.length && a.stops.every((stop, i) => stop.kind === b.stops[i].kind && stop.color === b.stops[i].color);
-  }
-  var matchesPreset = (preset, s = settings) => sameSettings(s, presetSettings(preset, s));
-  var presetById = (id) => BUILT_IN_PRESETS.find((p) => p.id === id) ?? presets.find((p) => p.id === id) ?? null;
-  function validatePreset(entry) {
-    if (!entry || typeof entry !== "object" || typeof entry.id !== "string" || !entry.id || typeof entry.name !== "string")
-      return null;
-    const name = entry.name.trim();
-    if (!name || name.length > PRESET_NAME_MAX) return null;
-    const valid = validateSettings({ ...entry.settings, version: SCHEMA_VERSION });
-    return valid && { id: entry.id, name, settings: snapshot(valid) };
-  }
-  function loadPresets(raw = Spicetify.LocalStorage.get(presetsKey())) {
-    if (raw == null) return [];
-    let data = null;
-    try {
-      data = JSON.parse(raw);
-    } catch {
-    }
-    if (!data || data.version !== PRESETS_VERSION || !Array.isArray(data.presets)) {
-      console.warn(`[${P}] Saved presets were unreadable and have been ignored.`);
-      return [];
-    }
-    const list = [];
-    for (const entry of data.presets) {
-      const preset = validatePreset(entry);
-      if (!preset || list.length >= MAX_PRESETS || list.some((p) => p.id === preset.id)) continue;
-      preset.name = uniqueName(preset.name, list);
-      list.push(preset);
-    }
-    const dropped = data.presets.length - list.length;
-    if (dropped) console.warn(`[${P}] ${dropped} saved preset${dropped === 1 ? " was" : "s were"} invalid and dropped.`);
-    return list;
-  }
-  function savePresets() {
-    Spicetify.LocalStorage.set(presetsKey(), JSON.stringify({ version: PRESETS_VERSION, presets }));
-  }
-  function uniqueName(name, list = presets, exceptId = null) {
-    const base = name.trim().slice(0, PRESET_NAME_MAX);
-    const taken = new Set([...BUILT_IN_PRESETS, ...list].filter((p) => p.id !== exceptId).map((p) => p.name.toLowerCase()));
-    if (!taken.has(base.toLowerCase())) return base;
-    for (let n = 2; ; n++) {
-      const suffix = ` (${n})`;
-      const candidate = base.slice(0, PRESET_NAME_MAX - suffix.length).trimEnd() + suffix;
-      if (!taken.has(candidate.toLowerCase())) return candidate;
-    }
-  }
-  var defaultPresetName = () => uniqueName(`Preset ${presets.length + 1}`);
-  function nextPresetId() {
-    const ids = new Set(presets.map((p) => p.id));
-    let n = 1;
-    while (ids.has(`p${n}`)) n++;
-    return `p${n}`;
-  }
-  function addPreset(name) {
-    if (presets.length >= MAX_PRESETS) return null;
-    const preset = { id: nextPresetId(), name: uniqueName(name.trim() || defaultPresetName()), settings: snapshot(settings) };
-    presets.push(preset);
-    savePresets();
-    return preset;
-  }
-  function renamePreset(id, name) {
-    const preset = presets.find((p) => p.id === id);
-    if (!preset || !name.trim()) return false;
-    preset.name = uniqueName(name, presets, id);
-    savePresets();
-    return true;
-  }
-  function updatePreset(id) {
-    const preset = presets.find((p) => p.id === id);
-    if (!preset) return false;
-    preset.settings = snapshot(settings);
-    savePresets();
-    return true;
-  }
-  function deletePreset(id) {
-    const index = presets.findIndex((p) => p.id === id);
-    if (index === -1) return null;
-    const [preset] = presets.splice(index, 1);
-    savePresets();
-    return { preset, index };
-  }
-  function restorePreset({ preset, index }) {
-    presets.splice(Math.min(index, presets.length), 0, preset);
-    savePresets();
-  }
-
-  // src/shared/reset.js
-  var RESET_CONFIRM_MS = 3e3;
-  var RESET_CONFIRM_LABEL = "Confirm reset?";
-  function enableReset(m) {
-    const button = m.resetButton;
-    let timer = 0;
-    const armed = () => button.classList.contains(`${P}-armed`);
-    const disarm = () => {
-      clearTimeout(timer);
-      timer = 0;
-      button.classList.remove(`${P}-armed`);
-      m.resetLabel.textContent = "Reset";
-    };
-    button.addEventListener("click", () => {
-      if (armed()) {
-        disarm();
-        resetSettings();
-        return;
-      }
-      button.classList.add(`${P}-armed`);
-      m.resetLabel.textContent = RESET_CONFIRM_LABEL;
-      timer = setTimeout(disarm, RESET_CONFIRM_MS);
-    });
-    button.addEventListener("blur", () => armed() && disarm());
-    disarmOnOutsideInput(m, () => armed() ? button : null, disarm);
-    m.cleanups.push(disarm);
-  }
-  function disarmOnOutsideInput(m, armedEl, disarm) {
-    const listen = (type, handler) => {
-      document.addEventListener(type, handler, true);
-      m.cleanups.push(() => document.removeEventListener(type, handler, true));
-    };
-    const elsewhere = (e) => {
-      const el = armedEl();
-      if (el && !el.contains(e.target)) disarm();
-    };
-    listen("pointerdown", elsewhere);
-    listen("click", elsewhere);
-    listen("keydown", (e) => {
-      const el = armedEl();
-      if (!el) return;
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        disarm();
-      } else if (!el.contains(e.target)) disarm();
-    });
-  }
-
-  // src/shared/presets-ui.js
-  var UNDO_MS = 1e4;
-  var APPLY_LABEL = "Apply?";
-  var SAVE_LABEL = "Save the current settings as a preset";
-  var SAVE_FULL_LABEL = `Up to ${MAX_PRESETS} presets`;
-  var OWN_PRESET_HINT = "Right-click to rename, update or delete";
-  var chipEl = (id) => modal?.chips.querySelector(`.${P}-preset-chip[data-preset="${CSS.escape(id)}"]`) ?? null;
-  var isOwnPreset = (id) => presets.some((p) => p.id === id);
-  function enablePresets(m) {
-    m.chips.addEventListener("click", (e) => {
-      const chip = e.target.closest(`.${P}-chip`);
-      if (!chip || chip.disabled) return;
-      if (chip === m.saveChip) startNaming(m, "save");
-      else clickChip(m, chip);
-    });
-    m.chips.addEventListener("contextmenu", (e) => {
-      const chip = e.target.closest(`.${P}-preset-chip`);
-      if (!chip || !isOwnPreset(chip.dataset.preset)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const id = chip.dataset.preset;
-      if (popover?.id === id && performance.now() - popover.openedAt < 500) return;
-      const r = chip.getBoundingClientRect();
-      const onChip = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-      openChipMenu(id, onChip ? { at: { x: e.clientX, y: e.clientY } } : { keyboard: true });
-    });
-    m.chips.addEventListener("keydown", (e) => {
-      const chip = e.target.closest(`.${P}-preset-chip`);
-      if (!chip || !isOwnPreset(chip.dataset.preset) || !(e.key === "ContextMenu" || e.shiftKey && e.key === "F10")) return;
-      e.preventDefault();
-      openChipMenu(chip.dataset.preset, { keyboard: true });
-    });
-    m.chips.addEventListener("focusout", (e) => m.armed?.chip === e.target && disarmChip(m));
-    disarmOnOutsideInput(m, () => m.armed?.chip ?? null, () => disarmChip(m));
-    m.nameField.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        stopNaming(m, { commit: true });
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        stopNaming(m, { refocus: true });
-      }
-    });
-    m.nameField.addEventListener("blur", () => stopNaming(m));
-    m.renameItem.addEventListener("click", () => runChipAction((id) => startNaming(m, "rename", id)));
-    m.updatePresetItem.addEventListener(
-      "click",
-      () => runChipAction((id) => {
-        if (pendingUndo?.kind === "preset") clearUndo();
-        if (updatePreset(id)) renderChipsLater(m, id);
-      })
-    );
-    m.deletePresetItem.addEventListener("click", () => runChipAction((id) => deleteWithUndo(m, id)));
-    m.undoButton.addEventListener("click", runUndo);
-    enableSharing(m);
-    m.cleanups.push(() => {
-      disarmChip(m);
-      clearUndo();
-    });
-  }
-  var EXPORT_TITLE = "Copy a share code to the clipboard";
-  var EXPORT_LABEL = "Export";
-  var COPIED_LABEL = "Copied";
-  var COPIED_MS = 2e3;
-  var COPY_HINT = /Mac/i.test(navigator.platform) ? "Press ⌘C to copy" : "Press Ctrl+C to copy";
-  var IMPORT_ERROR = "Not a valid code";
-  var PREVIEW_CODE_MESSAGE = "Previewing code — Apply to use it";
-  function enableSharing(m) {
-    m.exportButton.addEventListener("click", () => copyCode(m));
-    m.codeOutput.addEventListener("blur", () => m.codeFallback.hidden = true);
-    m.importButton.addEventListener("click", () => toggleImport(m));
-    m.importApply.addEventListener("click", () => importCode(m));
-    m.codeInput.addEventListener("input", () => {
-      setImportError(m, false);
-      renderPreview();
-      renderStatus();
-    });
-    m.codeInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        importCode(m);
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        toggleImport(m, false);
-        m.importButton.focus({ preventScroll: true });
-      }
-    });
-    m.cleanups.push(() => clearTimeout(m.copiedTimer));
-  }
-  async function copyCode(m) {
-    const code = encodeCode(settings);
-    const tier = await writeClipboard(code);
-    if (modal !== m) return tier;
-    showExportCopied(m, !!tier);
-    if (!tier) {
-      m.codeOutput.value = code;
-      m.codeFallback.hidden = false;
-      m.codeOutput.focus({ preventScroll: true });
-      m.codeOutput.select();
-      return null;
-    }
-    m.codeFallback.hidden = true;
-    m.announce.textContent = "Share code copied";
-    return tier;
-  }
-  function showExportCopied(m, copied) {
-    clearTimeout(m.copiedTimer);
-    m.exportLabel.textContent = copied ? COPIED_LABEL : EXPORT_LABEL;
-    m.exportIcon.toggleAttribute("hidden", copied);
-    m.exportCheck.toggleAttribute("hidden", !copied);
-    if (copied) m.copiedTimer = setTimeout(() => showExportCopied(m, false), COPIED_MS);
-  }
-  function toggleImport(m, open = m.importPanel.hidden) {
-    m.importPanel.hidden = !open;
-    m.importButton.setAttribute("aria-expanded", String(open));
-    if (open) {
-      m.codeInput.value = "";
-      setImportError(m, false);
-      m.codeInput.focus({ preventScroll: true });
-    }
-    if (modal !== m) return;
-    renderPreview();
-    renderStatus();
-  }
-  function setImportError(m, invalid) {
-    if (invalid) m.codeInput.setAttribute("aria-invalid", "true");
-    else m.codeInput.removeAttribute("aria-invalid");
-    m.importError.textContent = invalid ? IMPORT_ERROR : "";
-  }
-  function importCode(m) {
-    const decoded = decodeShareCode(m.codeInput.value);
-    if (!decoded) {
-      setImportError(m, true);
-      return false;
-    }
-    toggleImport(m, false);
-    m.importButton.focus({ preventScroll: true });
-    applySettings(decoded.settings, IMPORTED[decoded.from], m.importButton);
-    return true;
-  }
-  function clickChip(m, chip) {
-    const preset = presetById(chip.dataset.preset);
-    if (!preset || matchesPreset(preset)) return;
-    if (m.armed?.chip !== chip) return armChip(m, chip, preset);
-    disarmChip(m);
-    applySettings(presetSettings(preset), `Applied "${preset.name}"`, chip);
-  }
-  function armChip(m, chip, preset) {
-    disarmChip(m);
-    chip.classList.add(`${P}-armed`);
-    chip.querySelector(`.${P}-chip-label`).textContent = APPLY_LABEL;
-    chip.setAttribute("aria-label", `Apply "${preset.name}"?`);
-    m.armed = { chip, name: preset.name, settings: presetSettings(preset) };
-    renderPreview();
-    renderStatus();
-  }
-  function disarmChip(m) {
-    if (!m.armed) return;
-    const { chip } = m.armed;
-    m.armed = null;
-    const name = presetById(chip.dataset.preset)?.name ?? "";
-    chip.classList.remove(`${P}-armed`);
-    chip.querySelector(`.${P}-chip-label`).textContent = name;
-    chip.setAttribute("aria-label", name);
-    if (modal !== m) return;
-    renderPreview();
-    renderStatus();
-  }
-  function previewing(m) {
-    if (m.armed) return { settings: m.armed.settings, message: `Previewing "${m.armed.name}" — click it again to apply, Esc to cancel` };
-    const code = m.importPanel.hidden ? null : decodeShareCode(m.codeInput.value);
-    return code && { settings: code.settings, message: PREVIEW_CODE_MESSAGE };
-  }
-  function applySettings(next, message, focusAfterUndo = null) {
-    const previous = structuredClone(settings);
-    setSettings(next);
-    setSelectedId(settings.stops[0].id);
-    settingsReplaced();
-    update();
-    offerUndo(message, (hadFocus) => {
-      setSettings(previous);
-      setSelectedId(previous.stops[0].id);
-      settingsReplaced();
-      update();
-      if (hadFocus && focusAfterUndo?.isConnected) focusAfterUndo.focus({ preventScroll: true });
-    }, { trackSettings: true });
-  }
-  function deleteWithUndo(m, id) {
-    const removed = deletePreset(id);
-    if (!removed) return;
-    renderChipsLater(m, (presets[removed.index] ?? presets[removed.index - 1])?.id ?? "save");
-    offerUndo(`Deleted "${removed.preset.name}"`, (hadFocus) => {
-      restorePreset(removed);
-      renderChipsLater(m, hadFocus ? removed.preset.id : null);
-    }, { kind: "preset" });
-  }
-  var pendingUndo = null;
-  function offerUndo(message, restore, { trackSettings = false, kind = "settings" } = {}) {
-    clearUndo();
-    const after = trackSettings ? JSON.stringify(settings) : null;
-    pendingUndo = { message, kind, restore, after, timer: setTimeout(clearUndo, UNDO_MS) };
-    renderStatus();
-  }
-  function clearUndo() {
-    if (!pendingUndo) return;
-    clearTimeout(pendingUndo.timer);
-    pendingUndo = null;
-    renderStatus();
-  }
-  function runUndo() {
-    const undo = pendingUndo;
-    if (!undo) return;
-    const hadFocus = !!modal && document.activeElement === modal.undoButton;
-    clearUndo();
-    undo.restore(hadFocus);
-  }
-  function renderStatus() {
-    if (!modal) return;
-    const preview = previewing(modal);
-    const undo = !preview && pendingUndo;
-    modal.undoLine.classList.toggle(`${P}-has-status`, !!(preview || undo));
-    modal.undoText.textContent = preview ? preview.message : undo ? `${undo.message} · ` : "";
-    modal.undoButton.hidden = !undo;
-  }
-  function renderChips(m) {
-    disarmChip(m);
-    if (!m.naming) m.saveChip.after(m.nameField);
-    for (const chip of m.chips.querySelectorAll(`.${P}-preset-chip`)) chip.remove();
-    m.builtInRow.append(...BUILT_IN_PRESETS.map(presetChip));
-    for (const preset of presets) m.saveChip.before(presetChip(preset));
-    const full = presets.length >= MAX_PRESETS;
-    m.saveChip.disabled = full;
-    m.saveChip.title = full ? SAVE_FULL_LABEL : SAVE_LABEL;
-    renderPresetStates();
-  }
-  function renderChipsLater(m, focusId = null) {
-    closePopover();
-    disarmChip(m);
-    setTimeout(() => {
-      if (modal !== m) return;
-      renderChips(m);
-      const target = focusId === "save" ? m.saveChip : focusId ? chipEl(focusId) : null;
-      target?.focus({ preventScroll: true });
-    }, 0);
-  }
-  function presetChip(preset) {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = `${P}-chip ${P}-preset-chip`;
-    chip.dataset.preset = preset.id;
-    chip.setAttribute("aria-pressed", "false");
-    chip.setAttribute("aria-label", preset.name);
-    chip.title = preset.builtIn ? preset.name : `${preset.name}
-${OWN_PRESET_HINT}`;
-    chip.innerHTML = `<span class="${P}-chip-swatch" aria-hidden="true"></span><span class="${P}-chip-text"><span class="${P}-chip-label" aria-live="polite"></span><span class="${P}-sizer" aria-hidden="true"></span><span class="${P}-sizer" aria-hidden="true">${APPLY_LABEL}</span></span>`;
-    chip.querySelector(`.${P}-chip-swatch`).style.backgroundImage = previewImage(presetSettings(preset));
-    chip.querySelector(`.${P}-chip-label`).textContent = preset.name;
-    chip.querySelector(`.${P}-sizer`).textContent = preset.name;
-    return chip;
-  }
-  function renderPresetStates() {
-    if (!modal) return;
-    for (const chip of modal.chips.querySelectorAll(`.${P}-preset-chip`)) {
-      const preset = presetById(chip.dataset.preset);
-      chip.setAttribute("aria-pressed", String(!!preset && matchesPreset(preset)));
-    }
-  }
-  function startNaming(m, mode, id = null) {
-    if (m.naming) return;
-    const preset = mode === "rename" ? presets.find((p) => p.id === id) : null;
-    const chip = mode === "rename" ? chipEl(id) : m.saveChip;
-    if (!chip || mode === "rename" && !preset) return;
-    disarmChip(m);
-    m.naming = { mode, id, chip };
-    chip.before(m.nameField);
-    chip.hidden = true;
-    m.nameField.value = preset ? preset.name : defaultPresetName();
-    m.nameField.setAttribute("aria-label", preset ? `New name for "${preset.name}"` : "Preset name");
-    m.nameField.hidden = false;
-    m.nameField.focus({ preventScroll: true });
-    m.nameField.select();
-  }
-  function stopNaming(m, { commit = false, refocus = false } = {}) {
-    const naming = m.naming;
-    if (!naming) return;
-    m.naming = null;
-    m.nameField.hidden = true;
-    m.saveChip.after(m.nameField);
-    naming.chip.hidden = false;
-    if (!commit) {
-      if (refocus) naming.chip.focus({ preventScroll: true });
-      return;
-    }
-    if (pendingUndo?.kind === "preset") clearUndo();
-    if (naming.mode === "save") renderChipsLater(m, addPreset(m.nameField.value)?.id ?? "save");
-    else {
-      renamePreset(naming.id, m.nameField.value);
-      renderChipsLater(m, naming.id);
-    }
-  }
-  function openChipMenu(id, { at = null, keyboard = false } = {}) {
-    const anchor = chipEl(id);
-    if (!anchor || !isOwnPreset(id)) return;
-    disarmChip(modal);
-    setMenuKind("chip");
-    if (showPopover(id, modal.menu, at, anchor) && keyboard) menuItems()[0]?.focus({ preventScroll: true });
-  }
-  function runChipAction(action) {
-    if (!popover) return;
-    const { id } = popover;
-    closePopover();
-    action(id);
-  }
-
   // src/shared/modal.js
   function modalCss() {
     return `
@@ -6481,66 +6871,77 @@ ${OPTION_ROW_CSS.trim()}
     modal.switchButton.setAttribute("aria-checked", String(settings.gradient));
   }
 
-  // src/shared/settings.js
-  var settings;
-  function setSettings(next) {
-    settings = next;
+  // src/shared/hover.js
+  var DEFAULT_HOVER = "none";
+  var HOVER_LABELS = { none: "None", brighten: "Brighten", glow: "Glow" };
+  var BRIGHTEN = "brightness(1.2)";
+  var GLOW_BLUR = "8px";
+  var HOVER_TRANSITION = "filter .2s ease-out";
+  function validHover(value) {
+    const hover = value === void 0 ? DEFAULT_HOVER : value;
+    return HOVER_MODES.includes(hover) ? hover : null;
   }
-  function migrate(data) {
-    let current = data;
-    while (current && typeof current === "object" && Number.isInteger(current.version) && current.version < SCHEMA_VERSION && typeof MIGRATIONS[current.version] === "function") {
-      current = MIGRATIONS[current.version](structuredClone(current));
+  var MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+  var reducedMotion = () => !!window.matchMedia?.(MOTION_QUERY).matches;
+  function watchReducedMotion(apply) {
+    window.matchMedia?.(MOTION_QUERY).addEventListener?.("change", () => apply());
+  }
+  var HOVER_ROW_CSS = `
+.${P}-hover { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.${P}-hover-options { display: flex; gap: 2px; padding: 2px; border-radius: 500px; background-color: rgba(var(--spice-rgb-text), .1); }
+.${P}-hover-option { padding: 4px 12px; border: 1px solid transparent; border-radius: 500px; background: none; color: var(--spice-text); font: inherit; font-size: .875rem; font-weight: 700; white-space: nowrap; cursor: pointer; transition: background-color .15s; }
+.${P}-hover-option[aria-checked="true"] { background-color: var(--spice-button); }
+.${P}-hover-option.${P}-on-light { color: var(--spice-main); }
+.${P}-hover-option:hover:not([aria-checked="true"]) { background-color: rgba(var(--spice-rgb-text), .1); }
+.${P}-hover-option:focus-visible { outline: 2px solid var(--spice-text); outline-offset: 2px; }
+`;
+  function hoverRowMarkup() {
+    return `
+    <div class="${P}-hover">
+      <span class="${P}-label" id="${P}-hover-label">Hover</span>
+      <div class="${P}-hover-options" role="radiogroup" aria-labelledby="${P}-hover-label">
+        ${HOVER_MODES.map((mode) => `<button type="button" class="${P}-hover-option" role="radio" data-hover="${mode}">${HOVER_LABELS[mode]}</button>`).join("")}
+      </div>
+    </div>`;
+  }
+  function hoverRefs(root) {
+    return {
+      hover: root.querySelector(`.${P}-hover`),
+      hoverOptions: root.querySelector(`.${P}-hover-options`),
+      hoverButtons: [...root.querySelectorAll(`.${P}-hover-option`)]
+    };
+  }
+  function setHover(mode) {
+    if (!HOVER_MODES.includes(mode) || mode === settings.hover) return;
+    settings.hover = mode;
+    update({ rerender: false });
+    if (modal) renderHoverRow();
+  }
+  function enableHoverRow(m) {
+    m.hoverOptions.addEventListener("click", (e) => {
+      const button = e.target.closest(`.${P}-hover-option`);
+      if (button) setHover(button.dataset.hover);
+    });
+    m.hoverOptions.addEventListener("keydown", (e) => {
+      const button = e.target.closest(`.${P}-hover-option`);
+      if (!button || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const i = m.hoverButtons.indexOf(button);
+      const last = m.hoverButtons.length - 1;
+      const next = { ArrowLeft: i ? i - 1 : last, ArrowRight: i === last ? 0 : i + 1, Home: 0, End: last }[e.key];
+      if (next === void 0) return;
+      e.preventDefault();
+      setHover(m.hoverButtons[next].dataset.hover);
+      m.hoverButtons[next].focus();
+    });
+  }
+  function renderHoverRow() {
+    const onLight = labelOnLight(modal.hoverOptions);
+    for (const button of modal.hoverButtons) {
+      const checked = button.dataset.hover === settings.hover;
+      button.setAttribute("aria-checked", String(checked));
+      button.tabIndex = checked ? 0 : -1;
+      button.classList.toggle(`${P}-on-light`, checked && onLight);
     }
-    return current;
-  }
-  function loadSettings(raw = Spicetify.LocalStorage.get(settingsKey())) {
-    if (raw == null) return defaultSettings();
-    let data = null;
-    try {
-      data = migrate(JSON.parse(raw));
-    } catch {
-    }
-    const valid = validateSettings(data);
-    if (valid) return valid;
-    if (KEEP_NEWER_SETTINGS && Number.isInteger(data?.version) && data.version > SCHEMA_VERSION) {
-      console.warn(`[${P}] Saved settings are from a newer version of the extension; using defaults.`);
-      return defaultSettings();
-    }
-    console.warn(`[${P}] Saved settings were invalid and have been reset to defaults.`);
-    const defaults = defaultSettings();
-    Spicetify.LocalStorage.set(settingsKey(), JSON.stringify(defaults));
-    return defaults;
-  }
-  var saveTimer = 0;
-  function saveSettings() {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(flushSettings, SAVE_DELAY);
-  }
-  function flushSettings() {
-    if (!saveTimer) return;
-    clearTimeout(saveTimer);
-    saveTimer = 0;
-    Spicetify.LocalStorage.set(settingsKey(), JSON.stringify(settings));
-  }
-  function cancelSave() {
-    clearTimeout(saveTimer);
-    saveTimer = 0;
-  }
-  function stopColour(stop) {
-    return stop.kind === "theme" ? THEME_COLOUR : stop.color;
-  }
-  function isInert(s) {
-    return !s.gradient && s.stops[0].kind === "theme";
-  }
-  function update({ rerender = true } = {}) {
-    applyCss();
-    if (modal) {
-      rerender ? renderModal() : renderPreview();
-      renderPresetStates();
-    }
-    if (pendingUndo?.after && pendingUndo.after !== JSON.stringify(settings)) clearUndo();
-    afterSettingsChange();
-    saveSettings();
   }
 
   // src/gcb/bar.js
@@ -6565,7 +6966,7 @@ ${OPTION_ROW_CSS.trim()}
   var TEXT_MODES = ["auto", "black", "white", "default"];
   var DEFAULT_TEXT = "auto";
   function defaultSettings() {
-    return { version: SCHEMA_VERSION, gradient: false, textColour: DEFAULT_TEXT, stops: [{ id: "s1", kind: "theme" }] };
+    return { version: SCHEMA_VERSION, gradient: false, textColour: DEFAULT_TEXT, hover: DEFAULT_HOVER, stops: [{ id: "s1", kind: "theme" }] };
   }
   var MIGRATIONS = {
     // 1 → 2: transparency is gone. Fully transparent stops (kind "transparent", or a #rrggbbaa with
@@ -6588,6 +6989,8 @@ ${OPTION_ROW_CSS.trim()}
     if (data.stops.length < 1 || data.stops.length > MAX_STOPS) return null;
     const textColour = data.textColour === void 0 ? DEFAULT_TEXT : data.textColour;
     if (!TEXT_MODES.includes(textColour)) return null;
+    const hover = validHover(data.hover);
+    if (!hover) return null;
     const ids = /* @__PURE__ */ new Set();
     const stops = [];
     for (const stop of data.stops) {
@@ -6597,14 +7000,14 @@ ${OPTION_ROW_CSS.trim()}
       else if (HEX_RE.test(stop.color)) stops.push({ id: stop.id, kind: "custom", color: stop.color.toLowerCase() });
       else return null;
     }
-    return { version: SCHEMA_VERSION, gradient: data.gradient && stops.length > 1, textColour, stops };
+    return { version: SCHEMA_VERSION, gradient: data.gradient && stops.length > 1, textColour, hover, stops };
   }
   var GPB_CODE_PREFIX = CODE_FORMATS.gpb.prefix;
   var TEXT_CODES = CODE_FORMATS.gcb.codes;
   var decodeCode = decodeShareCode;
 
   // src/gcb/ui.js
-  var OPTION_ROW_CSS = `
+  var OPTION_ROW_CSS = HOVER_ROW_CSS + `
 .gcb-text { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
 .gcb-modes { display: flex; gap: 2px; padding: 2px; border-radius: 500px; background-color: rgba(var(--spice-rgb-text), .1); }
 .gcb-mode { padding: 4px 12px; border: 1px solid transparent; border-radius: 500px; background: none; color: var(--spice-text); font: inherit; font-size: .875rem; font-weight: 700; white-space: nowrap; cursor: pointer; transition: background-color .15s; }
@@ -6622,13 +7025,15 @@ ${OPTION_ROW_CSS.trim()}
       <div class="gcb-modes" role="radiogroup" aria-labelledby="gcb-text-label">
         ${TEXT_MODES.map((mode) => `<button type="button" class="gcb-mode" role="radio" data-mode="${mode}">${TEXT_LABELS[mode]}</button>`).join("")}
       </div>
-    </div>`;
+    </div>` + hoverRowMarkup();
   }
   function previewMarkup() {
     return `<div class="gcb-preview" role="img" aria-label="Preview of the Connect bar">${withClass(DEVICE_ICON, "gcb-preview-icon")}<span class="gcb-preview-label">${PREVIEW_LABEL}</span></div>`;
   }
   function extraRefs(root) {
     return {
+      ...hoverRefs(root),
+      // #3, #8
       text: root.querySelector(".gcb-text"),
       textLabel: root.querySelector("#gcb-text-label"),
       textModes: root.querySelector(".gcb-modes"),
@@ -6639,12 +7044,15 @@ ${OPTION_ROW_CSS.trim()}
   }
   function enableOptionRow(m) {
     enableTextColour(m);
+    enableHoverRow(m);
   }
   function renderOptionRow() {
     renderTextColour();
+    renderHoverRow();
   }
   function onThemeColour() {
     renderTextColour();
+    renderHoverRow();
     renderPreview();
   }
   function settingsReplaced() {
@@ -6871,12 +7279,38 @@ ${OPTION_ROW_CSS.trim()}
     if (colours.length === 1) colours.push(colours[0]);
     return `linear-gradient(to right, ${colours.join(", ")})`;
   }
-  function buildCss(s, textColour = null) {
+  function buildCss(s, textColour = null, reduced = reducedMotion()) {
     const declarations = [];
     if (!isInert(s)) declarations.push(`background-image: ${barImage(s)};`);
     if (textColour) declarations.push(`--text-base: ${textColour};`, `--essential-base: ${textColour};`);
-    if (!declarations.length) return "";
-    return [`${SELECTOR} {`, ...declarations.map((line) => `  ${line}`), `}`, ``].join("\n");
+    const hover = hoverCss(s, reduced);
+    if (!declarations.length && !hover.length) return "";
+    const bar = declarations.length ? [`${SELECTOR} {`, ...declarations.map((line) => `  ${line}`), `}`] : [];
+    return [...bar, ...hover, ``].join("\n");
+  }
+  var HOVER_SELECTORS = { hover: `${SELECTOR}:hover`, glow: `${SELECTOR}::before`, glowHover: `${SELECTOR}:hover::before` };
+  function hoverCss(s, reduced = reducedMotion()) {
+    const transition = reduced ? [] : [`  transition: ${HOVER_TRANSITION};`];
+    if (s.hover === "brighten")
+      return [...reduced ? [] : [`${SELECTOR} {`, ...transition, `}`], `${HOVER_SELECTORS.hover} {`, `  filter: ${BRIGHTEN};`, `}`];
+    if (s.hover !== "glow") return [];
+    const image = isInert(s) ? "linear-gradient(var(--background-base), var(--background-base))" : barImage(s);
+    return [
+      `${HOVER_SELECTORS.glow} {`,
+      `  content: "";`,
+      `  position: absolute;`,
+      `  inset: 0;`,
+      `  z-index: -1;`,
+      `  border-radius: inherit;`,
+      `  background-image: ${image};`,
+      `  filter: blur(0);`,
+      ...transition,
+      `  pointer-events: none;`,
+      `}`,
+      `${HOVER_SELECTORS.glowHover} {`,
+      `  filter: blur(${GLOW_BLUR});`,
+      `}`
+    ];
   }
   function applyCss() {
     let style = document.getElementById("gcb-style");
@@ -7220,6 +7654,101 @@ ${OPTION_ROW_CSS.trim()}
     const own = sameFileCopies(copies);
     const others = copies.filter((src) => !own.includes(src));
     return [own[0], ...others.map((src) => `also ${src}, one of them skipped by the conflict rule`)].join("; ");
+  }
+  function checkHoverSettings(check) {
+    const base = { ...defaultSettings(), gradient: true, stops: [custom("s1", RED), custom("s2", BLUE)] };
+    const legacy = { ...base };
+    delete legacy.hover;
+    const warnings = [];
+    const warn = console.warn;
+    console.warn = (...args) => warnings.push(args.join(" "));
+    let loaded;
+    try {
+      loaded = loadSettings(JSON.stringify(legacy));
+    } finally {
+      console.warn = warn;
+    }
+    check(
+      HOVER_ISSUE,
+      'Stored settings without "hover" (from before this option) load as "none", no warning',
+      loaded.hover === "none" && loaded.stops.length === 2 && !warnings.length,
+      `${loaded.hover}, ${warnings.length} warning(s)`
+    );
+    const trips = HOVER_MODES.map((hover2) => [hover2, validateSettings(JSON.parse(JSON.stringify({ ...base, hover: hover2 })))?.hover]);
+    const others = ["sparkle", "", null, 1, "glow"].filter((value) => !HOVER_MODES.includes(value));
+    const accepted = others.filter((value) => validateSettings({ ...base, hover: value }) !== null);
+    check(
+      HOVER_ISSUE,
+      `Every hover option (${HOVER_MODES.join(", ")}) round-trips through storage; anything else is invalid settings`,
+      trips.every(([hover2, back]) => hover2 === back) && !accepted.length,
+      `${trips.map(([hover2, back]) => `${hover2} → ${back}`).join(", ")}; ${accepted.length} of ${others.length} other values accepted`
+    );
+    const current = { ...base, hover: HOVER_MODES[HOVER_MODES.length - 1] };
+    const { version, hover, ...saved } = structuredClone(base);
+    const own = presetSettings({ id: "p1", name: "Mine", settings: saved }, current);
+    const builtIn = presetSettings(BUILT_IN_PRESETS[0], current);
+    const stored = loadPresets(JSON.stringify({ version: 1, presets: [{ id: "p1", name: "Mine", settings: { ...saved, hover: "brighten" } }] }));
+    check(
+      HOVER_ISSUE,
+      "Presets don't store the hover effect; applying a built-in or an own preset keeps the current one",
+      builtIn.hover === current.hover && own.hover === current.hover && stored.length === 1 && !("hover" in stored[0].settings),
+      `built-in → ${builtIn.hover}, own → ${own.hover}, stored keys ${stored[0] ? Object.keys(stored[0].settings).join(",") : "none"} (current ${current.hover})`
+    );
+    const code = encodeCode(current);
+    const body = atob(code.slice(code.indexOf(":") + 1).replace(/-/g, "+").replace(/_/g, "/"));
+    const decoded = decodeShareCode(code, current)?.settings;
+    const intoNone = decodeShareCode(code, { ...current, hover: "none" })?.settings;
+    check(
+      HOVER_ISSUE,
+      "Share codes don't carry the hover effect (format unchanged); importing one keeps the current hover effect",
+      code === encodeCode({ ...current, hover: "none" }) && !/hover|"h"/.test(body) && decoded?.hover === current.hover && intoNone?.hover === "none",
+      `${code}; imported with ${current.hover} → ${decoded?.hover}, with none → ${intoNone?.hover}`
+    );
+  }
+  async function checkHoverRow(check, m, { realClick, press, saveDelay }) {
+    const nodes = [...m.hoverButtons];
+    const shows = (hover) => settings.hover === hover && m.hoverButtons.every((b, i) => b === nodes[i] && b.isConnected && b.getAttribute("aria-checked") === "true" === (b.dataset.hover === hover) && b.tabIndex === (b.dataset.hover === hover ? 0 : -1));
+    const state = () => `hover ${settings.hover}, checked ${m.hoverButtons.filter((b) => b.getAttribute("aria-checked") === "true").map((b) => b.dataset.hover).join() || "none"}, tabindex ${m.hoverButtons.map((b) => b.tabIndex).join()}, focus ${document.activeElement?.dataset?.hover ?? document.activeElement?.className}`;
+    const style = () => document.getElementById(`${P}-style`)?.textContent ?? "";
+    check(
+      HOVER_ISSUE,
+      `Hover row: a radiogroup of ${HOVER_MODES.map((h) => HOVER_LABELS[h]).join(", ")}, labelled "Hover"; plain buttons, no <select>`,
+      m.hoverOptions.getAttribute("role") === "radiogroup" && m.hoverOptions.getAttribute("aria-labelledby") === `${P}-hover-label` && m.root.querySelector(`#${P}-hover-label`)?.textContent === "Hover" && m.hoverButtons.map((b) => b.textContent).join() === HOVER_MODES.map((h) => HOVER_LABELS[h]).join() && m.hoverButtons.every((b) => b.tagName === "BUTTON" && b.getAttribute("role") === "radio") && !m.hover.querySelector("select"),
+      state()
+    );
+    const clicks = [];
+    for (const hover of [...HOVER_MODES.slice(1), HOVER_MODES[0]]) {
+      realClick(m.hoverButtons[HOVER_MODES.indexOf(hover)]);
+      const live = hover === "none" ? !style().includes(":hover") : style().includes(":hover");
+      clicks.push(`${hover}${shows(hover) && live ? "" : ` (expected ${hover}, stylesheet ${live ? "ok" : "wrong"})`}`);
+    }
+    check(
+      HOVER_ISSUE,
+      "Clicking each hover option applies it at once (:hover rules only when it isn't None), the row updated in place",
+      !clicks.some((c) => c.includes("expected")),
+      clicks.join(", ")
+    );
+    m.hoverButtons[0].focus();
+    const last = HOVER_MODES.length - 1;
+    const keys = [];
+    for (const [key, index] of [["ArrowRight", 1], ["End", last], ["Home", 0], ["ArrowLeft", last], ["ArrowRight", 0]]) {
+      press(document.activeElement, key);
+      const want = HOVER_MODES[index];
+      keys.push(`${key} → ${settings.hover}${shows(want) && document.activeElement === m.hoverButtons[index] ? "" : ` (expected ${want} focused)`}`);
+    }
+    const altKept = press(document.activeElement, "ArrowRight", { altKey: true });
+    keys.push(`Alt+→ → ${settings.hover}${settings.hover === HOVER_MODES[0] && altKept ? "" : " (expected no change)"}`);
+    check(
+      HOVER_ISSUE,
+      "Hover keyboard: →, End, Home and ← (wrapping) change the option and move focus; Alt+→ doesn't",
+      !keys.some((k) => k.includes("expected")),
+      keys.join(", ")
+    );
+    realClick(m.hoverButtons[last]);
+    await sleep(saveDelay + 100);
+    const stored = JSON.parse(Spicetify.LocalStorage.get(settingsKey()) ?? "{}").hover;
+    realClick(m.hoverButtons[0]);
+    check(HOVER_ISSUE, "The chosen hover option is saved", stored === HOVER_MODES[last], `stored ${stored}`);
   }
   function checkEntryText(check) {
     const ISSUE = "gradient-bars#6";
@@ -8553,7 +9082,7 @@ ${OPTION_ROW_CSS.trim()}
     check(
       11,
       "Text colour row between the Gradient row and the Presets row: a radiogroup of Auto, Black, White, Spotify default; no <select>",
-      m.gradientRow.nextElementSibling === m.text && m.text.nextElementSibling === m.presets && m.textModes.getAttribute("role") === "radiogroup" && m.textModes.getAttribute("aria-labelledby") === "gcb-text-label" && m.textButtons.map((b) => b.textContent).join() === "Auto,Black,White,Spotify default" && m.textButtons.every((b) => b.tagName === "BUTTON" && b.getAttribute("role") === "radio") && !m.root.querySelector("select") && m.textButtons.every((b) => reachable(b)),
+      m.gradientRow.nextElementSibling === m.text && m.text.nextElementSibling === m.hover && m.hover.nextElementSibling === m.presets && m.textModes.getAttribute("role") === "radiogroup" && m.textModes.getAttribute("aria-labelledby") === "gcb-text-label" && m.textButtons.map((b) => b.textContent).join() === "Auto,Black,White,Spotify default" && m.textButtons.every((b) => b.tagName === "BUTTON" && b.getAttribute("role") === "radio") && !m.root.querySelector("select") && m.textButtons.every((b) => reachable(b)),
       textState()
     );
     setTestSettings(true, [custom("s1", BLACK), custom("s2", WHITE)]);
@@ -8567,9 +9096,9 @@ ${OPTION_ROW_CSS.trim()}
         recalcTextColour({ region: { from: 0, to: 1 } });
         window.__gcb.status();
         const extra = [...m.text.children].filter((el) => el !== m.textLabel && el !== m.textModes);
-        const hintLike = m.root.querySelector(".gcb-text-hint, .gcb-warning") ?? m.text.querySelector('[id$="-hint"], [aria-describedby]') ?? (m.text.nextElementSibling === m.presets ? null : m.text.nextElementSibling);
+        const hintLike = m.root.querySelector(".gcb-text-hint, .gcb-warning") ?? m.text.querySelector('[id$="-hint"], [aria-describedby]') ?? (m.text.nextElementSibling === m.hover ? null : m.text.nextElementSibling);
         const words = /\d(\.\d)?:1\b|4\.5|contrast|readab|warning/i.exec(m.text.textContent);
-        const gap = m.presets.getBoundingClientRect().top - m.text.getBoundingClientRect().bottom;
+        const gap = m.hover.getBoundingClientRect().top - m.text.getBoundingClientRect().bottom;
         const rowGap2 = parseFloat(getComputedStyle(m.root).rowGap);
         if (!textShows(mode) || extra.length || hintLike || words || Math.abs(gap - rowGap2) > 0.5)
           hintProblems.push(`${mode}: ${extra.length} extra element(s), ${hintLike ? `.${hintLike.className}` : "no hint element"}, ${words ? `"${words[0]}"` : "no contrast text"}, gap ${gap.toFixed(1)} px (modal gap ${rowGap2} px)`);
@@ -8617,6 +9146,8 @@ ${OPTION_ROW_CSS.trim()}
       textKeys.join(", ")
     );
     stillOpen("changing the text colour");
+    await checkHoverRow(check, m, { realClick, press, saveDelay: SAVE_DELAY });
+    stillOpen("changing the hover effect");
     realClick(m.textButtons[1]);
     await sleep(SAVE_DELAY + 100);
     const storedText = JSON.parse(Spicetify.LocalStorage.get(settingsKey()) ?? "{}").textColour;
@@ -8825,7 +9356,8 @@ ${FIXTURES.gcbThemeWhite}	 `) && !!decodeCode(` ${FIXTURES.gpbVoid} `), "");
     check(
       29,
       "Presets row between the Text colour row and the preview: label left, Export and Import right, every chip reachable",
-      m.presets.previousElementSibling === m.text && m.presets.nextElementSibling === m.preview && Math.abs(labelRect0.left - presetsRect.left) <= 1 && Math.abs(toolsRect.right - presetsRect.right) <= 1 && !unreachableChips.length,
+      m.presets.previousElementSibling === m.hover && m.hover.previousElementSibling === m.text && m.presets.nextElementSibling === m.preview && // Hover (#8) under Text colour
+      Math.abs(labelRect0.left - presetsRect.left) <= 1 && Math.abs(toolsRect.right - presetsRect.right) <= 1 && !unreachableChips.length,
       `after .${m.presets.previousElementSibling?.className}, before .${m.presets.nextElementSibling?.className}` + (unreachableChips.length ? `; not reachable: ${unreachableChips.map((el) => el.textContent).join(", ")}` : "")
     );
     const shareButtons = [[m.exportButton, "Export", EXPORT_TITLE], [m.importButton, "Import", IMPORT_TITLE]];
@@ -9243,7 +9775,7 @@ ${FIXTURES.gcbThemeWhite}	 `) && !!decodeCode(` ${FIXTURES.gpbVoid} `), "");
     check(
       2,
       "Defaults: one theme stop, gradient off, text colour Auto",
-      JSON.stringify(defaultSettings()) === JSON.stringify({ version: 2, gradient: false, textColour: "auto", stops: [{ id: "s1", kind: "theme" }] }),
+      JSON.stringify(defaultSettings()) === JSON.stringify({ version: 2, gradient: false, textColour: "auto", hover: "none", stops: [{ id: "s1", kind: "theme" }] }),
       JSON.stringify(defaultSettings())
     );
     const invalid = {
@@ -9323,17 +9855,142 @@ ${FIXTURES.gcbThemeWhite}	 `) && !!decodeCode(` ${FIXTURES.gpbVoid} `), "");
       `written at once ${writtenAtOnce}, ${JSON.stringify(reloaded)}`
     );
   }
+  var HOVER = "gradient-bars#8";
+  function checkHoverCss(check, skip) {
+    const stops = [custom("s1", RED), custom("s2", GREEN), custom("s3", BLUE)];
+    const with_ = (hover, extra = {}) => ({ version: SCHEMA_VERSION, gradient: true, textColour: DEFAULT_TEXT, hover, stops, ...extra });
+    const samples = [
+      ["brighten", with_("brighten")],
+      ["glow", with_("glow")],
+      ["glow, solid", with_("glow", { gradient: false, stops: [custom("s1", RED)] })],
+      ["glow, inert theme colour", { ...defaultSettings(), hover: "glow" }],
+      ["brighten, inert theme colour", { ...defaultSettings(), hover: "brighten" }]
+    ];
+    const problems = samples.flatMap(([label, s]) => [false, true].flatMap((reduced2) => {
+      const css = buildCss(s, WHITE, reduced2);
+      return [...cssProblems(css), ...parseProblems(css)].map((p) => `${label}${reduced2 ? " (reduced motion)" : ""}: ${p}`);
+    }));
+    check(
+      HOVER,
+      "Brighten and Glow pass the CSS lint and the browser's parser (gradient, solid, inert; with and without reduced motion)",
+      !problems.length,
+      problems.join("; ") || `${samples.length * 2} stylesheets`
+    );
+    const rules = (css) => [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].map(([, sel, body]) => [sel.trim(), body]);
+    const glowCss = buildCss(samples[1][1], null, false);
+    const brightCss = buildCss(samples[0][1], null, false);
+    const filtered = [...rules(glowCss), ...rules(brightCss)].filter(([, body]) => /filter: (?!blur\(0\))/.test(body)).map(([sel]) => sel);
+    const reduced = buildCss(samples[1][1], null, true);
+    check(
+      HOVER,
+      "The effect applies only under :hover (Glow rests unblurred behind the bar); reduced motion drops the transition, not the effect",
+      filtered.length === 2 && filtered.every((sel) => sel.includes(":hover")) && glowCss.includes(`${HOVER_SELECTORS.glow} {`) && glowCss.includes("filter: blur(0);") && !reduced.includes("transition") && reduced.includes(`filter: blur(${GLOW_BLUR});`) && !/:hover|::before|filter|transition/.test(buildCss({ ...samples[1][1], hover: "none" }, null, false)),
+      `filtered under: ${filtered.join(", ")}`
+    );
+    const solid = buildCss(samples[2][1], null, false);
+    const inert = buildCss(samples[3][1], null, false);
+    check(
+      HOVER,
+      "Glow is a copy of the bar's own gradient; one colour glows in that colour, an inert bar in its own --background-base",
+      glowCss.includes(`background-image: ${barImage(samples[1][1])};`) && solid.includes(`background-image: linear-gradient(to right, ${RED}, ${RED});`) && inert.includes("background-image: linear-gradient(var(--background-base), var(--background-base));") && !inert.includes(`${SELECTOR} {
+  background-image`),
+      inert.replace(/\s+/g, " ").slice(0, 160)
+    );
+    const flags = {
+      "filter on the bar at rest": cssProblems(`${SELECTOR} {
+  filter: ${BRIGHTEN};
+}
+`),
+      "a blurred glow at rest": cssProblems(`${HOVER_SELECTORS.glow} {
+  filter: blur(${GLOW_BLUR});
+}
+`),
+      "::after": cssProblems(`${SELECTOR}::after {
+  content: "";
+}
+`),
+      "another transition": cssProblems(`${SELECTOR} {
+  transition: all 1s;
+}
+`),
+      "background-color on the glow": cssProblems(`${HOVER_SELECTORS.glow} {
+  background-color: red;
+}
+`)
+    };
+    const missed = Object.entries(flags).filter(([, found]) => !found.length).map(([label]) => label);
+    check(
+      HOVER,
+      "The CSS lint flags a filter at rest, a blurred glow at rest, other pseudo-elements, other transitions and other glow properties",
+      !missed.length,
+      missed.length ? `not flagged: ${missed.join(", ")}` : Object.values(flags).map((p) => p.join("/")).join("; ")
+    );
+    const bar = findBar();
+    const names = [
+      "Live bar with Glow: the pseudo-element sits behind the bar (z-index -1, anchored to it), unblurred at rest, blurred on hover with the text still on top",
+      "Live bar with Glow or Brighten: background, size, radius and inline style untouched at rest"
+    ];
+    if (!bar) return names.forEach((name) => skip(HOVER, name));
+    const geometryBefore = barWithAndWithout(bar, barGeometry);
+    setTestSettings(true, stops, DEFAULT_TEXT, "glow");
+    const glow = getComputedStyle(bar, "::before");
+    const restState = `content ${glow.content}, z-index ${glow.zIndex}, filter ${glow.filter}, position ${glow.position}; bar position ${getComputedStyle(bar).position}`;
+    const restOk = glow.content === '""' && glow.zIndex === "-1" && (bar.matches(":hover") || glow.filter === "blur(0px)") && glow.position === "absolute" && getComputedStyle(bar).position !== "static";
+    const simulated = Object.assign(document.createElement("style"), { id: "gcb-hover-probe", textContent: `${buildCss(settings, appliedTextColour(), true).replaceAll(":hover", "")}${HOVER_SELECTORS.glow} {
+  transition: none;
+}
+` });
+    document.head.append(simulated);
+    let hovered;
+    try {
+      const span = bar.querySelector(BAR_LINK)?.querySelector("span");
+      const r = span?.getBoundingClientRect();
+      hovered = { filter: getComputedStyle(bar, "::before").filter, textOnTop: !!r && span.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)) };
+    } finally {
+      simulated.remove();
+    }
+    const glowState = `${restState}; simulated hover: glow ${hovered.filter}, text on top ${hovered.textOnTop}`;
+    const ok = restOk && hovered.filter === `blur(${GLOW_BLUR})` && hovered.textOnTop;
+    const glowGeometry = barWithAndWithout(bar, barGeometry);
+    setTestSettings(true, stops, DEFAULT_TEXT, "brighten");
+    const brightRest = bar.matches(":hover") || getComputedStyle(bar).filter === "none";
+    const brightGeometry = barWithAndWithout(bar, barGeometry);
+    if (!document.contains(bar) || findBar() !== bar) return names.forEach((name) => skip(HOVER, name, BAR_GONE));
+    check(HOVER, names[0], ok, glowState);
+    check(
+      HOVER,
+      names[1],
+      glowGeometry.ours === glowGeometry.spotify && brightGeometry.ours === brightGeometry.spotify && brightRest && geometryBefore.spotify === glowGeometry.spotify && !bar.getAttribute("style"),
+      `glow ${glowGeometry.ours === glowGeometry.spotify ? "same" : `${glowGeometry.ours} vs ${glowGeometry.spotify}`}; brighten at rest filter ${getComputedStyle(bar).filter}`
+    );
+  }
 
   // src/gcb/selftest.js
   var NO_BAR = "bar not present — play on another device";
   var HASHED_SAMPLE = ".alQyi9QVSuY6ma3oYVy6";
   var songchangeCount = () => Spicetify.Player.eventListeners?.songchange?.length ?? 0;
-  function setTestSettings(gradient, stops, textColour = DEFAULT_TEXT) {
-    setSettings({ version: SCHEMA_VERSION, gradient, textColour, stops: stops.map((s) => ({ ...s })) });
+  function setTestSettings(gradient, stops, textColour = DEFAULT_TEXT, hover = DEFAULT_HOVER) {
+    setSettings({ version: SCHEMA_VERSION, gradient, textColour, hover, stops: stops.map((s) => ({ ...s })) });
     update();
     recalcTextColour();
   }
   var ALLOWED_PROPS = ["background-image", "--text-base", "--essential-base"];
+  var HOVER_PROPS = {
+    [HOVER_SELECTORS.hover]: { filter: BRIGHTEN },
+    [HOVER_SELECTORS.glow]: {
+      content: '""',
+      position: "absolute",
+      inset: "0",
+      "z-index": "-1",
+      "border-radius": "inherit",
+      "background-image": null,
+      filter: "blur(0)",
+      transition: HOVER_TRANSITION,
+      "pointer-events": "none"
+    },
+    [HOVER_SELECTORS.glowHover]: { filter: `blur(${GLOW_BLUR})` }
+  };
+  var OUR_SELECTORS = [SELECTOR, ...Object.values(HOVER_SELECTORS)];
   var HASH_LIKE = /(?<![\w-])[\w-]{16,20}(?![\w-])/g;
   var hashLike = (selector) => (selector.match(HASH_LIKE) ?? []).filter((t) => /[a-z]/.test(t) && /[A-Z]/.test(t));
   var OPACITY_RE = /rgba\(|\btransparent\b|#[0-9a-f]{8}\b/gi;
@@ -9342,13 +9999,16 @@ ${FIXTURES.gcbThemeWhite}	 `) && !!decodeCode(` ${FIXTURES.gpbVoid} `), "");
     return lintCss(css, {
       whole: (text) => opacityIn(text).map((found) => `translucent colour ${found}`),
       rule: (sel) => [
-        ...sel !== SELECTOR ? [`rule not on the Connect bar: ${sel}`] : [],
+        ...!OUR_SELECTORS.includes(sel) ? [`rule not on the Connect bar: ${sel}`] : [],
         ...hashLike(sel).map((token) => `hash-like class name ${token}`)
       ],
-      declaration: (sel, name) => {
+      declaration: (sel, name, value) => {
         if (!name) return null;
         if (name === "--background-base") return "sets --background-base";
-        return ALLOWED_PROPS.includes(name) ? null : `sets ${name}`;
+        if (sel === SELECTOR) return ALLOWED_PROPS.includes(name) || name === "transition" && value === HOVER_TRANSITION ? null : `sets ${name}`;
+        const allowed = HOVER_PROPS[sel] ?? {};
+        if (!(name in allowed)) return `sets ${name} in ${sel}`;
+        return allowed[name] === null || allowed[name] === value ? null : `sets ${name}: ${value} in ${sel}`;
       }
     });
   }
@@ -9359,9 +10019,11 @@ ${FIXTURES.gcbThemeWhite}	 `) && !!decodeCode(` ${FIXTURES.gpbVoid} `), "");
     const written = [...css.matchAll(/\{([^}]*)\}/g)].map(([, body]) => body.split(";").filter((d) => d.trim()).length);
     const problems = [];
     if (rules.length !== written.length) problems.push(`${rules.length} of ${written.length} rules parsed`);
+    const names = [...css.matchAll(/\{([^}]*)\}/g)].map(([, body]) => body.split(";").map((d) => d.split(":")[0].trim()).filter(Boolean));
     rules.forEach((rule, i) => {
-      if (rule.style?.length !== written[i]) problems.push(`rule ${i + 1}: ${rule.style?.length} of ${written[i]} declarations parsed`);
-      if (rule.selectorText?.replace(/\s+/g, " ") !== SELECTOR) problems.push(`rule ${i + 1}: selector parsed as ${rule.selectorText}`);
+      const lost = (names[i] ?? []).filter((name) => !rule.style?.getPropertyValue(name));
+      if (lost.length || (rule.style?.length ?? 0) < written[i]) problems.push(`rule ${i + 1}: ${lost.join(", ") || `${rule.style?.length} of ${written[i]}`} not parsed`);
+      if (!OUR_SELECTORS.includes(rule.selectorText?.replace(/\s+/g, " "))) problems.push(`rule ${i + 1}: selector parsed as ${rule.selectorText}`);
     });
     return problems;
   }
@@ -9440,6 +10102,8 @@ ${FIXTURES.gcbThemeWhite}	 `) && !!decodeCode(` ${FIXTURES.gpbVoid} `), "");
         checkBarGone(check);
         await checkEntries(check, skip);
         await runChecks(check, skip, state.rootStyle, state.restoreButton);
+        checkHoverSettings(check);
+        checkHoverCss(check, skip);
       } catch (e) {
         check(9, "Self-test ran to completion", false, e?.stack || e);
       } finally {
@@ -9471,6 +10135,7 @@ ${FIXTURES.gcbThemeWhite}	 `) && !!decodeCode(` ${FIXTURES.gpbVoid} `), "");
       setPresets(loadPresets());
       window.addEventListener("beforeunload", flushSettings);
       recalcTextColour();
+      watchReducedMotion(applyCss);
       watchTextTriggers();
       window.__gcb = { version: VERSION, copy: COPY, status: () => statusReport(), selfTest, openSettings };
       startup.entry = enableBarContextMenu();
