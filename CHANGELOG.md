@@ -4,6 +4,7 @@ Releases are tagged per extension (`gpb-v…`, `gcb-v…`, `gb-v…`). Older rel
 
 ## Unreleased
 
+- New setting **Hover**: *Brighten* lights the bar up a little while you hover it; on the Connect bar, *Glow* adds a soft glow in the bar's own colours ([#3](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/3), [#8](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/8)). Off by default; presets and share codes don't include it, so applying one keeps your choice. No transition if your system asks for reduced motion.
 - Self-tests never write your real settings or presets: a run uses its own keys, and leftovers from an interrupted run are removed on start-up ([#13](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/13)).
 - Gradient Connect Bar's self-test skips the checks that need the Connect bar if it disappears mid-run, instead of failing them ([#14](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/14)).
 

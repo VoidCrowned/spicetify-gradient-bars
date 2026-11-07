@@ -20,6 +20,7 @@ Install **either Gradient Bars or the ones you want separately, not both**. Grad
 - **Share codes**: copy your settings as a short code and paste someone else's. Codes work across both bars.
 - **Progress bar only:** three ways to spread the gradient (*Compress*, *Anchored*, *Slide*).
 - **Connect bar only:** the text colour (*Auto* picks black or white, whichever stays readable over the whole gradient).
+- **Hover:** *Brighten* on both bars; *Glow* (a soft glow in the bar's own colours) on the Connect bar.
 - **Leaves everything else alone**: no `!important`, no layout changes, nothing outside the bars. With default settings nothing changes at all.
 
 ## Installation

@@ -2,6 +2,16 @@
 
 Mirrors the [milestones](https://github.com/VoidCrowned/spicetify-gradient-bars/milestones). Issues are the source of truth; this file follows them.
 
+## Now: hover effect (on `dev`)
+
+Tracking: [#17](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/17). Built on `dev`; `main` stays what's released until I merge.
+
+| Step | Status |
+|---|---|
+| Song progress bar: Hover → None, Brighten ([#3](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/3)) | ✅ on `dev` |
+| Connect bar: Hover → None, Brighten, Glow ([#8](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/8)) | ✅ on `dev` |
+| Test build checked, `dev` merged into `main` | waiting for me |
+
 ## Done: one repo for both bars (7 Nov 2026)
 
 Tracking: [#1](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/1). Gradient Progress Bar and Gradient Connect Bar move here with their shared code in one place, plus Gradient Bars, which runs both from one file. Behaviour stays the same.
@@ -23,11 +33,9 @@ Agreed ideas, not scheduled. Tracking: [#10](https://github.com/VoidCrowned/spic
 | # | Issue | Bar |
 |---|---|---|
 | [#2](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/2) | Custom stop positions on the progress bar | GPB |
-| [#3](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/3) | Hover effect option for the progress bar | GPB |
 | [#4](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/4) | Opt-in colours for the track and the volume bar | GPB |
 | [#5](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/5) | Anchored: handle takes the colour under the playhead | GPB |
 | [#7](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/7) | Connect bar: mirror the song progress | GCB |
-| [#8](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/8) | Hover effect for the Connect bar | GCB |
 | [#9](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/9) | Custom stop positions on the Connect bar | GCB |
 | [#11](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/11) | One settings window for Gradient Bars | GB |
 

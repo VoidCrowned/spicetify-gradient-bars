@@ -27,11 +27,11 @@ The checks cover start-up and the entry points, the shared top-bar button, rende
 
 At most 8 items, only what code can't check:
 
-1. Hover, click-seek and drag the song progress bar, solid and gradient, in each Spread mode: no flicker; Compress, Anchored and Slide look right at the start, middle and end.
+1. Hover, click-seek and drag the song progress bar, solid and gradient, in each Spread mode: no flicker; Compress, Anchored and Slide look right at the start, middle and end; with Hover → Brighten it brightens gently, the volume slider never.
 2. The colour picker is fully visible under Hazy; dragging in the square and hue bar is smooth; the eyedropper works.
 3. With playback-bar-waveform: the gradient sits inside the waveform, also in Anchored.
 4. Hazy's colour (Custom color, or album art across songs): the bar and the selected option button follow, the label stays readable.
-5. The Connect bar (play on another device) matches the preview strip, and its text stays readable with Auto.
+5. The Connect bar (play on another device) matches the preview strip, and its text stays readable with Auto; Hover → Glow shows a soft glow in its colours, not cut off.
 6. One brush button in the top bar; with both bars its menu lists both, and each opens the right settings.
 7. Presets: preview then apply, Export shows *Copied*, Import of a code from the other bar works.
 8. Reload Spotify: settings kept, no `[gpb]`/`[gcb]` errors in the console.
