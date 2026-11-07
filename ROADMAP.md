@@ -2,7 +2,7 @@
 
 Mirrors the [milestones](https://github.com/VoidCrowned/spicetify-gradient-bars/milestones). Issues are the source of truth; this file follows them.
 
-## Now: one repo for both bars
+## Done: one repo for both bars (7 Nov 2026)
 
 Tracking: [#1](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/1). Gradient Progress Bar and Gradient Connect Bar move here with their shared code in one place, plus Gradient Bars, which runs both from one file. Behaviour stays the same.
 
@@ -13,7 +13,8 @@ Tracking: [#1](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/1).
 | Self-tests print a summary; `selfTest({ full: true })` copies the JSON | ✅ |
 | Manifest, README, this roadmap; open issues moved | ✅ |
 | Duplicate guard, load origin, old repos forward here ([#15](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/15)) | ✅ |
-| Releases GPB 1.8.0, GCB 1.0.1, GB 1.0.0, then the Marketplace ([#16](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/16)) | ✅ (7 Nov 2026); archiving the old repos is left |
+| Releases GPB 1.8.0, GCB 1.0.1, GB 1.0.0, then the Marketplace ([#16](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/16)) | ✅ (7 Nov 2026) |
+| Old repos archived | ✅ |
 
 ## Future
 
