@@ -13,7 +13,7 @@ Tracking: [#1](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/1).
 | Self-tests print a summary; `selfTest({ full: true })` copies the JSON | ✅ |
 | Manifest, README, this roadmap; open issues moved | ✅ |
 | Duplicate guard, load origin, old repos forward here ([#15](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/15)) | ✅ |
-| Releases GPB 1.8.0, GCB 1.0.1, GB 1.0.0, then the Marketplace ([#16](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/16)) | ready, waiting for me |
+| Releases GPB 1.8.0, GCB 1.0.1, GB 1.0.0, then the Marketplace ([#16](https://github.com/VoidCrowned/spicetify-gradient-bars/issues/16)) | ✅ (7 Nov 2026); archiving the old repos is left |
 
 ## Future
 
@@ -48,3 +48,4 @@ Before this repo, each bar had its own. Full history in the old roadmaps.
 |---|---|---|
 | Gradient Progress Bar | v1.0.0 (13 Oct 2026) … v1.7.0 (19 Oct 2026): Compress/Anchored/Slide, keyboard reordering, the −\|+ stepper, presets and share codes, the shared top-bar button | [roadmap](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/blob/main/ROADMAP.md), [changelog](https://github.com/VoidCrowned/spicetify-gradient-progress-bar/blob/main/CHANGELOG.md) |
 | Gradient Connect Bar | v1.0.0 (19 Oct 2026): GPB's editor on the Connect bar, text colour, presets, share codes, the shared top-bar button | [roadmap](https://github.com/VoidCrowned/spicetify-gradient-connect-bar/blob/main/ROADMAP.md), [changelog](https://github.com/VoidCrowned/spicetify-gradient-connect-bar/blob/main/CHANGELOG.md) |
+| All three, from this repo | [GPB 1.8.0](https://github.com/VoidCrowned/spicetify-gradient-bars/releases/tag/gpb-v1.8.0), [GCB 1.0.1](https://github.com/VoidCrowned/spicetify-gradient-bars/releases/tag/gcb-v1.0.1), [GB 1.0.0](https://github.com/VoidCrowned/spicetify-gradient-bars/releases/tag/gb-v1.0.0) (7 Nov 2026): one repo, Gradient Bars, the duplicate guard, old-repo installs forward here | [changelog](CHANGELOG.md) |
